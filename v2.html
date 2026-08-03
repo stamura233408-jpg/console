@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>鍵持ち込みコンソール v2</title>
+<style>
+:root{
+  --bg:#EAECE8; --panel:#F5F6F3; --line:#C7CCC5; --line2:#DDE1DA;
+  --ink:#151C19; --dim:#5A6660;
+  --pine:#2E5C4F; --pineBg:#DCE7E1;
+  --rust:#A2432A; --rustBg:#F5E6DF;
+  --amber:#7A5D10; --amberBg:#F3EBD5;
+  --mono: ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans: system-ui,-apple-system,"Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121614; --panel:#1A211E; --line:#2E3A35; --line2:#232C28;
+    --ink:#DFE5E1; --dim:#8A968F;
+    --pine:#6FBFA3; --pineBg:#1D302A;
+    --rust:#E08668; --rustBg:#2E1F1A;
+    --amber:#D9B65C; --amberBg:#2B2517;
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overscroll-behavior:none}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.7;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit;font-size:16px;color:var(--ink)}
+button{cursor:pointer}
+#app{display:flex;flex-direction:column;height:100dvh;min-height:0}
+
+header{display:flex;align-items:center;gap:8px;padding:9px 12px;padding-top:calc(9px + env(safe-area-inset-top));
+  background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto}
+.hbtn{min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;background:transparent;
+  border:1px solid transparent;border-radius:3px;font-size:19px;color:var(--dim)}
+.hbtn:active{background:var(--line2)}
+#hid{flex:1;min-width:0;font-family:var(--mono);font-size:11.5px;line-height:1.4}
+#hid .p{display:flex;align-items:center;gap:6px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+#hid .m{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:0 0 auto}
+
+.bar{display:none;padding:7px 14px;font-family:var(--mono);font-size:11.5px;line-height:1.6;border-bottom:1px solid}
+.bar.on{display:block}
+.bar.warn{background:var(--amberBg);color:var(--amber);border-color:var(--amber)}
+.bar.stop{background:var(--rustBg);color:var(--rust);border-color:var(--rust)}
+
+#log{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 14px 6px;min-height:0}
+.wrap{max-width:720px;margin:0 auto}
+.msg{margin-bottom:20px}
+.who{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);
+  margin-bottom:5px;display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.who .meta{letter-spacing:0;text-transform:none;opacity:.85}
+.who .est{color:var(--amber)}
+.body{white-space:pre-wrap;word-break:break-word;font-size:15.5px}
+.msg.user .body{background:var(--panel);border:1px solid var(--line2);border-left:3px solid var(--ink);padding:10px 12px;border-radius:3px}
+.msg.assistant .body{border-left:3px solid var(--pine);padding:1px 0 1px 12px}
+.msg.error .body{border-left:3px solid var(--rust);background:var(--rustBg);color:var(--rust);padding:10px 12px;
+  font-family:var(--mono);font-size:12.5px;border-radius:3px}
+.msg.dropped{opacity:.45}
+.msg .act{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap}
+.mini{background:transparent;border:1px solid var(--line);border-radius:3px;color:var(--dim);
+  font-family:var(--mono);font-size:11px;padding:5px 9px;min-height:32px}
+.mini:active{background:var(--line2)}
+details.raw{margin-top:8px;font-family:var(--mono);font-size:11px}
+details.raw pre{white-space:pre-wrap;word-break:break-all;margin:6px 0 0;opacity:.85}
+.cursor{display:inline-block;width:8px;height:15px;background:var(--pine);vertical-align:-2px;animation:bl .9s steps(2) infinite}
+@keyframes bl{0%,50%{opacity:1}51%,100%{opacity:0}}
+#intro{max-width:720px;margin:20px auto;font-family:var(--mono);font-size:12.5px;color:var(--dim);line-height:1.85}
+#intro b{color:var(--ink)}
+#intro div{padding:7px 0;border-bottom:1px solid var(--line2)}
+
+#composer{flex:0 0 auto;background:var(--panel);border-top:1px solid var(--line);padding:9px 12px calc(9px + env(safe-area-inset-bottom))}
+#plan{max-width:720px;margin:0 auto 7px;font-family:var(--mono);font-size:11px;color:var(--dim);
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-height:22px}
+#plan .pick{color:var(--pine);font-weight:600}
+#plan .why{opacity:.8}
+#crow{max-width:720px;margin:0 auto;display:flex;gap:9px;align-items:flex-end}
+#input{flex:1;min-height:46px;max-height:32dvh;padding:11px 12px;background:var(--bg);border:1px solid var(--line);
+  border-radius:3px;font-size:16px;line-height:1.5;resize:none}
+#send{min-width:74px;min-height:46px;padding:0 16px;background:var(--pine);color:#fff;border:1px solid var(--pine);
+  border-radius:3px;font-weight:600;font-size:15px}
+#send.stop{background:var(--rust);border-color:var(--rust)}
+#send:disabled{opacity:.4}
+#cfoot{max-width:720px;margin:7px auto 0;font-family:var(--mono);font-size:10.5px;color:var(--dim);display:flex;gap:12px;flex-wrap:wrap}
+
+#scrim{position:fixed;inset:0;background:rgba(0,0,0,.42);opacity:0;pointer-events:none;transition:opacity .18s;z-index:30}
+#scrim.on{opacity:1;pointer-events:auto}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;height:82dvh;background:var(--panel);
+  border-top:1px solid var(--line);border-radius:12px 12px 0 0;transform:translateY(101%);
+  transition:transform .22s cubic-bezier(.3,.8,.4,1);display:flex;flex-direction:column;box-shadow:0 -8px 30px rgba(0,0,0,.18)}
+#sheet.on{transform:none}
+.grab{width:38px;height:4px;background:var(--line);border-radius:2px;margin:9px auto 4px;flex:0 0 auto}
+#tabs{display:flex;border-bottom:1px solid var(--line);flex:0 0 auto;overflow-x:auto}
+#tabs button{flex:1 0 auto;min-height:44px;padding:0 12px;background:transparent;border:0;border-bottom:2px solid transparent;
+  font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+#tabs button.on{color:var(--ink);border-bottom-color:var(--pine)}
+.pane{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px calc(24px + env(safe-area-inset-bottom));display:none}
+.pane.on{display:block}
+
+label{display:block;font-family:var(--mono);font-size:10.5px;color:var(--dim);margin:0 0 5px;letter-spacing:.05em;text-transform:uppercase}
+.field{margin-bottom:13px}
+input[type=text],input[type=password],select,textarea.set{width:100%;padding:11px 12px;background:var(--bg);
+  border:1px solid var(--line);border-radius:3px}
+textarea.set{font-family:var(--mono);font-size:14px;line-height:1.55;resize:vertical}
+.hint{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px;line-height:1.65}
+.hint.ok{color:var(--pine)} .hint.bad{color:var(--rust)} .hint.warn{color:var(--amber)}
+.btn{width:100%;min-height:46px;background:var(--bg);border:1px solid var(--line);border-radius:3px;font-size:14px;
+  display:flex;align-items:center;justify-content:center;gap:6px}
+.btn:active{background:var(--line2)}
+.btn.primary{background:var(--pine);color:#fff;border-color:var(--pine)}
+.btn.danger{color:var(--rust);border-color:var(--rust)}
+.row2{display:flex;gap:9px}.row2>*{flex:1}
+.picker{width:100%;min-height:48px;text-align:left;padding:9px 12px;background:var(--bg);border:1px solid var(--line);
+  border-radius:3px;font-family:var(--mono);font-size:13.5px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.picker span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picker .cv{color:var(--dim);flex:0 0 auto;font-size:16px}
+.item{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--line2);border-radius:3px;
+  margin-bottom:7px;background:var(--bg);min-height:46px}
+.item.on{border-color:var(--pine);box-shadow:inset 3px 0 0 var(--pine)}
+.item .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14.5px}
+.item .s{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:right;flex:0 0 auto}
+.logline{font-family:var(--mono);font-size:11px;padding:7px 0;border-bottom:1px solid var(--line2);display:flex;gap:8px;align-items:baseline}
+.logline .st{flex:0 0 auto;font-weight:600}
+.logline .u{flex:1;min-width:0;word-break:break-all;color:var(--dim)}
+.st.ok{color:var(--pine)} .st.bad{color:var(--rust)}
+.tbl{font-family:var(--mono);font-size:12px}
+.tbl .r{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dotted var(--line)}
+.tbl .r.tot{border-top:1px solid var(--ink);border-bottom:0;font-weight:600;margin-top:5px;padding-top:7px}
+.tbl .r span:last-child{text-align:right;white-space:nowrap}
+.meter{height:6px;background:var(--line2);border-radius:3px;overflow:hidden;margin:6px 0}
+.meter i{display:block;height:100%;background:var(--pine)}
+.meter i.w{background:var(--amber)} .meter i.d{background:var(--rust)}
+.note{background:var(--amberBg);border:1px solid var(--amber);border-radius:3px;padding:10px 12px;
+  font-family:var(--mono);font-size:11px;color:var(--amber);line-height:1.75;margin-bottom:14px}
+.note.red{background:var(--rustBg);border-color:var(--rust);color:var(--rust)}
+h3.sec{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+  margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+h3.sec:first-child{margin-top:0}
+
+#mp{position:fixed;inset:0;z-index:40;background:var(--panel);display:none;flex-direction:column;padding-top:env(safe-area-inset-top)}
+#mp.on{display:flex}
+#mphead{display:flex;gap:9px;padding:10px 12px;border-bottom:1px solid var(--line);align-items:center}
+#mpq{flex:1;padding:11px 12px;background:var(--bg);border:1px solid var(--line);border-radius:3px}
+#mplist{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px calc(24px + env(safe-area-inset-bottom))}
+.mrow{padding:11px 10px;border-bottom:1px solid var(--line2);font-family:var(--mono);font-size:13px;word-break:break-all;
+  min-height:46px;display:flex;align-items:center;gap:8px}
+.mrow:active{background:var(--line2)}
+.mrow.on{color:var(--pine);font-weight:600}
+.mrow .tagr{font-size:9.5px;color:var(--dim);border:1px solid var(--line);border-radius:2px;padding:1px 5px;flex:0 0 auto}
+
+@media (min-width:860px){
+  #sheet{left:auto;right:16px;bottom:16px;width:420px;height:min(780px,88dvh);border-radius:6px;border:1px solid var(--line)}
+  #mp{left:auto;right:16px;bottom:16px;top:auto;width:420px;height:min(780px,88dvh);border-radius:6px;border:1px solid var(--line)}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div id="hid">
+      <div class="p"><span class="dot" id="pdot"></span><span id="pname">—</span></div>
+      <div class="m" id="mname">モデル未選択</div>
+    </div>
+    <button class="hbtn" id="newbtn" title="新しい会話">＋</button>
+    <button class="hbtn" id="openbtn" title="設定">≡</button>
+  </header>
+
+  <div class="bar" id="storebar"></div>
+  <div class="bar" id="budgetbar"></div>
+
+  <div id="log">
+    <div class="wrap" id="stream"></div>
+    <div id="intro">
+      <div><b>1</b> ≡ →「接続」でプロバイダとAPIキーを設定</div>
+      <div><b>2</b>「予算」タブで上限を決める。上限に達すると送信が止まる</div>
+      <div><b>3</b>「自動選択」タブで軽い/中/重いにモデルを割り当てる</div>
+      <div><b>通信</b> 選んだプロバイダ以外には通信しない。「通信ログ」で全件確認できる</div>
+      <div><b>注意</b> 個人用・無保証・自己責任。会話とキーはこのブラウザにのみ保存される</div>
+    </div>
+  </div>
+
+  <div id="composer">
+    <div id="plan"></div>
+    <div id="crow">
+      <textarea id="input" rows="1" placeholder="ここに書く"></textarea>
+      <button id="send">送信</button>
+    </div>
+    <div id="cfoot">
+      <span id="ctx">履歴 0 通</span>
+      <span id="todayinfo"></span>
+    </div>
+  </div>
+</div>
+
+<div id="scrim"></div>
+<div id="sheet">
+  <div class="grab"></div>
+  <div id="tabs">
+    <button data-p="conn" class="on">接続</button>
+    <button data-p="budget">予算</button>
+    <button data-p="auto">自動選択</button>
+    <button data-p="usage">使用量</button>
+    <button data-p="conv">会話</button>
+    <button data-p="net">通信ログ</button>
+  </div>
+
+  <!-- 接続 -->
+  <div class="pane on" id="pane-conn">
+    <div class="note red">個人用・無保証・自己責任。<br>APIキーはこのブラウザのlocalStorageにのみ保存され、選んだプロバイダ以外には送られない。</div>
+    <div class="field">
+      <label for="prov">プロバイダ</label>
+      <select id="prov"></select>
+      <div class="hint" id="provhint"></div>
+    </div>
+    <div class="field">
+      <label for="key">APIキー</label>
+      <input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="貼り付ける">
+    </div>
+    <div class="field">
+      <label>モデル（手動時／自動オフ時に使用）</label>
+      <button class="picker" id="modelbtn"><span id="modellbl">未選択</span><span class="cv">▾</span></button>
+      <div class="hint" id="modelhint"></div>
+    </div>
+    <div class="field row2">
+      <button class="btn" id="test">接続テスト</button>
+      <button class="btn" id="refresh">一覧を更新</button>
+    </div>
+    <div class="hint" id="teststat" style="margin-top:-4px;margin-bottom:14px"></div>
+    <div class="field">
+      <label for="sys">システムプロンプト</label>
+      <textarea id="sys" class="set" rows="3" placeholder="空でも動く"></textarea>
+    </div>
+    <div class="field row2">
+      <div><label for="temp">温度</label><input type="text" id="temp" inputmode="decimal" value="1"></div>
+      <div><label for="maxtok">1回の最大出力</label><input type="text" id="maxtok" inputmode="numeric" value="4096"></div>
+    </div>
+    <button class="btn danger" id="forget">このプロバイダのキーを消す</button>
+  </div>
+
+  <!-- 予算 -->
+  <div class="pane" id="pane-budget">
+    <div class="note">
+      <b>この上限は「次の送信を止める」方式。</b><br>
+      送信前のトークン数は文字数からの概算で、日本語では誤差が大きい。実測はAPIの返答で上書きする。
+      したがって「1トークンも超えない」保証はできず、1回分は超過しうる。
+    </div>
+    <h3 class="sec">上限（トークン）</h3>
+    <div class="field">
+      <label for="capReq">1リクエストの入力上限</label>
+      <input type="text" id="capReq" inputmode="numeric" placeholder="空欄なら無制限">
+      <div class="hint">履歴が長くなりすぎたときの歯止め。超えると送信できない。</div>
+    </div>
+    <div class="field row2">
+      <div><label for="capDay">1日の合計</label><input type="text" id="capDay" inputmode="numeric" placeholder="無制限"></div>
+      <div><label for="capMonth">1か月の合計</label><input type="text" id="capMonth" inputmode="numeric" placeholder="無制限"></div>
+    </div>
+    <h3 class="sec">上限（概算金額・USD）</h3>
+    <div class="field row2">
+      <div><label for="capDayUsd">1日</label><input type="text" id="capDayUsd" inputmode="decimal" placeholder="無制限"></div>
+      <div><label for="capMonthUsd">1か月</label><input type="text" id="capMonthUsd" inputmode="decimal" placeholder="無制限"></div>
+    </div>
+    <div class="hint warn">金額は単価が分かっているモデルでしか計算できない。単価は変わるので、表示額と実請求は必ずずれる。トークン上限を主、金額上限を従として使うこと。</div>
+    <h3 class="sec">単価（1Mトークンあたり・USD）</h3>
+    <div class="hint" id="priceSrc" style="margin-top:0"></div>
+    <div class="field row2">
+      <div><label for="priceIn">入力</label><input type="text" id="priceIn" inputmode="decimal" placeholder="未設定"></div>
+      <div><label for="priceOut">出力</label><input type="text" id="priceOut" inputmode="decimal" placeholder="未設定"></div>
+    </div>
+    <div class="hint">いま選択中のモデルの単価。一覧APIが価格を返した場合は自動で入る。入っていなければ各社の料金ページを見て手入力する。</div>
+    <h3 class="sec">現在の消費</h3>
+    <div id="budgetMeters"></div>
+    <div class="row2" style="margin-top:14px">
+      <button class="btn" id="resetDay">当日分をリセット</button>
+      <button class="btn" id="resetMonth">当月分をリセット</button>
+    </div>
+  </div>
+
+  <!-- 自動選択 -->
+  <div class="pane" id="pane-auto">
+    <div class="note">
+      <b>この機能は「最適なモデル」を保証しない。</b><br>
+      内容を読む前に難易度は確定しないため、原理的に不可能。ここでやるのは、判定の根拠を見せて、間違っていたら即座に上書きできるようにすること。判定結果は送信前に必ず表示される。
+    </div>
+    <div class="field">
+      <label for="autoMode">動作</label>
+      <select id="autoMode">
+        <option value="off">オフ（上の「モデル」を常に使う）</option>
+        <option value="local">ローカル判定のみ（無料・即時）</option>
+        <option value="router">ルーターモデルに聞く（有料・少量）</option>
+      </select>
+      <div class="hint" id="autoHint"></div>
+    </div>
+    <h3 class="sec">段階ごとの割り当て</h3>
+    <div class="field">
+      <label>軽い — 短い質問、雑談、単純な変換</label>
+      <button class="picker tierpick" data-tier="light"><span>未設定</span><span class="cv">▾</span></button>
+    </div>
+    <div class="field">
+      <label>中 — 説明、下書き、短いコード</label>
+      <button class="picker tierpick" data-tier="mid"><span>未設定</span><span class="cv">▾</span></button>
+    </div>
+    <div class="field">
+      <label>重い — 設計、証明、長いコード、長文の分析</label>
+      <button class="picker tierpick" data-tier="heavy"><span>未設定</span><span class="cv">▾</span></button>
+    </div>
+    <h3 class="sec">ルーターモデル</h3>
+    <div class="field">
+      <label>難易度判定に使うモデル（最安のものを指定する）</label>
+      <button class="picker tierpick" data-tier="router"><span>未設定</span><span class="cv">▾</span></button>
+      <div class="hint">判定は「1〜3の数字のみ」で返させる。判定にかかったトークンも使用量に計上される。入力が40文字未満のときは呼ばずローカル判定で済ませる。</div>
+    </div>
+  </div>
+
+  <!-- 使用量 -->
+  <div class="pane" id="pane-usage">
+    <h3 class="sec">合計</h3>
+    <div class="tbl" id="usageTotals"></div>
+    <h3 class="sec">プロバイダ別</h3>
+    <div class="tbl" id="usageByProv"></div>
+    <h3 class="sec">モデル別</h3>
+    <div class="tbl" id="usageByModel"></div>
+    <h3 class="sec">この会話</h3>
+    <div class="tbl" id="usageConv"></div>
+    <div class="hint" id="ctxWarn" style="margin-top:12px"></div>
+    <button class="btn" id="dropOld" style="margin-top:12px">古い発言を送信対象から外す</button>
+    <button class="btn" id="dropUndo" style="margin-top:8px">外した発言を戻す</button>
+  </div>
+
+  <!-- 会話 -->
+  <div class="pane" id="pane-conv">
+    <div class="note">会話はこのブラウザのlocalStorageにのみ保存される。<b>ブラウザのデータを削除すると全部消える。</b>残したいものはJSONで書き出しておくこと。</div>
+    <div class="row2" style="margin-bottom:10px">
+      <button class="btn primary" id="newconv">新しい会話</button>
+      <button class="btn" id="renameconv">名前を変える</button>
+    </div>
+    <div class="row2" style="margin-bottom:14px">
+      <button class="btn" id="exportMd">この会話をMD</button>
+      <button class="btn" id="exportAll">全部JSON</button>
+    </div>
+    <div class="field">
+      <label for="importFile">JSONから読み込む（現在の会話に追加）</label>
+      <input type="file" id="importFile" accept="application/json,.json">
+    </div>
+    <div id="convlist"></div>
+  </div>
+
+  <!-- 通信ログ -->
+  <div class="pane" id="pane-net">
+    <div class="hint" style="margin:0 0 12px">このアプリが出した通信の全件。ここに載っていない宛先には通信していない。</div>
+    <button class="btn" id="clearnet" style="margin-bottom:12px">記録を消す</button>
+    <div id="netlist"></div>
+  </div>
+</div>
+
+<div id="mp">
+  <div id="mphead">
+    <input type="text" id="mpq" placeholder="絞り込む / 直接入力してEnter" spellcheck="false" autocomplete="off">
+    <button class="hbtn" id="mpclose">✕</button>
+  </div>
+  <div id="mplist"></div>
+</div>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+
+/* ===================== 保存層 ===================== */
+const store=(()=>{let ok=true;try{localStorage.setItem("__t","1");localStorage.removeItem("__t")}catch(e){ok=false}
+const mem={};return{ok,
+ get(k){try{return ok?localStorage.getItem(k):(mem[k]??null)}catch(e){return mem[k]??null}},
+ set(k,v){try{ok?localStorage.setItem(k,v):(mem[k]=v)}catch(e){mem[k]=v}},
+ del(k){try{ok?localStorage.removeItem(k):delete mem[k]}catch(e){delete mem[k]}}};})();
+if(!store.ok){const b=$("storebar");b.className="bar stop on";
+  b.textContent="localStorageが使えない。会話・キー・使用量はタブを閉じると消える。";}
+function J(s,f){try{const v=JSON.parse(s);return v??f}catch(e){return f}}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+/* ===================== プロバイダ =====================
+   [確認済] AnthropicはCORSに専用ヘッダが必要
+   [確認済] OpenRouterはブラウザ直叩き可
+   [未確認] xAI / DeepSeek / Anthropic がブラウザから通るか → 接続テストで各自確認
+   [未確認] 各社の一覧APIが価格を返すか → 返らなければ単価は手入力
+*/
+const PROVIDERS={
+ openrouter:{name:"OpenRouter",color:"#3E8E7E",shape:"openai",
+  chat:"https://openrouter.ai/api/v1/chat/completions",
+  models:"https://openrouter.ai/api/v1/models",
+  hint:"1本の鍵で複数社のモデルを叩ける。ブラウザ直叩き対応（実測）。プロンプトはOpenRouterのサーバーを経由する。",
+  head:k=>({"Authorization":"Bearer "+k,"Content-Type":"application/json","X-Title":"byok-console"})},
+ anthropic:{name:"Anthropic",color:"#C2603F",shape:"anthropic",
+  chat:"https://api.anthropic.com/v1/messages",
+  models:"https://api.anthropic.com/v1/models?limit=100",
+  hint:"ブラウザ用の専用ヘッダを自動で付ける。付けないと401。CORS可否は未検証なので接続テストで確認。",
+  head:k=>({"x-api-key":k,"anthropic-version":"2023-06-01",
+    "anthropic-dangerous-direct-browser-access":"true","Content-Type":"application/json"})},
+ xai:{name:"xAI (Grok)",color:"#7E8FA6",shape:"openai",
+  chat:"https://api.x.ai/v1/chat/completions",
+  models:"https://api.x.ai/v1/models",
+  hint:"ブラウザ直叩きの可否は公式に明記なし。未検証。接続テストで先に確かめること。",
+  head:k=>({"Authorization":"Bearer "+k,"Content-Type":"application/json"})},
+ deepseek:{name:"DeepSeek",color:"#5C6BC0",shape:"openai",
+  chat:"https://api.deepseek.com/chat/completions",
+  models:"https://api.deepseek.com/models",
+  hint:"ブラウザ直叩き可（実測）。V4では思考モードがモデル名ではなくパラメータに移った点に注意。",
+  head:k=>({"Authorization":"Bearer "+k,"Content-Type":"application/json"})}
+};
+const K=p=>"bk2.key."+p, MD=p=>"bk2.model."+p, MC=p=>"bk2.mcache."+p, RC=p=>"bk2.recent."+p;
+const PRICE=(p,m)=>"bk2.price."+p+"::"+m;
+const TIER=(p,t)=>"bk2.tier."+p+"."+t;
+const CACHE_MS=24*3600*1000;
+
+/* ===================== 状態 ===================== */
+let S={
+ prov: store.get("bk2.prov")||"openrouter",
+ convs: J(store.get("bk2.convs"),[]),
+ active: store.get("bk2.active")||null,
+ usage: J(store.get("bk2.usage"),{prov:{},model:{},day:{},month:{}}),
+ net: [], models: [], modelPrices: {},
+ busy:false, abort:null, mpTarget:null, lastPlan:null
+};
+const saveConvs=()=>store.set("bk2.convs",JSON.stringify(S.convs));
+const saveUsage=()=>store.set("bk2.usage",JSON.stringify(S.usage));
+const cur=()=>S.convs.find(c=>c.id===S.active)||null;
+const dayKey=()=>new Date().toLocaleDateString("sv-SE");           // YYYY-MM-DD
+const monthKey=()=>dayKey().slice(0,7);                             // YYYY-MM
+
+/* ===================== 通信（全fetchの唯一の入口） ===================== */
+async function call(url,opt){
+  const rec={url,t:new Date().toLocaleTimeString("ja-JP"),status:"…",ok:null,note:""};
+  S.net.unshift(rec); if(S.net.length>200)S.net.pop(); renderNet();
+  try{
+    const r=await fetch(url,opt);
+    rec.status="HTTP "+r.status; rec.ok=r.ok; renderNet(); return r;
+  }catch(e){ rec.status="ブロック"; rec.ok=false; renderNet(); throw e; }
+}
+function noteNet(tokIn,tokOut){ const r=S.net[0]; if(r) r.note=tokIn+"↓ "+tokOut+"↑"; renderNet(); }
+function renderNet(){
+  const box=$("netlist"); if(!box)return; box.innerHTML="";
+  if(!S.net.length){const d=document.createElement("div");d.className="hint";d.textContent="まだ通信していない。";box.appendChild(d);return}
+  S.net.forEach(r=>{
+    const d=document.createElement("div");d.className="logline";
+    const s=document.createElement("span");s.className="st "+(r.ok===true?"ok":r.ok===false?"bad":"");s.textContent=r.status;
+    const u=document.createElement("span");u.className="u";u.textContent=r.url+(r.note?"  ["+r.note+"]":"");
+    const t=document.createElement("span");t.style.cssText="color:var(--dim);flex:0 0 auto";t.textContent=r.t;
+    d.append(s,u,t);box.appendChild(d);
+  });
+}
+$("clearnet").addEventListener("click",()=>{S.net=[];renderNet()});
+
+/* ===================== トークン概算 =====================
+   [成立しない] 正確なトークン数はブラウザで計算できない。
+   外部トークナイザの読み込みは「外部通信禁止」要件と衝突するため、
+   文字種別の粗い係数で概算する。日本語では誤差が大きい。必ず「概算」と表示すること。
+*/
+function estTokens(text){
+  if(!text)return 0;
+  let cjk=0, other=0;
+  for(const ch of text){
+    const c=ch.codePointAt(0);
+    if((c>=0x3000&&c<=0x30FF)||(c>=0x4E00&&c<=0x9FFF)||(c>=0xFF00&&c<=0xFFEF)) cjk++;
+    else other++;
+  }
+  return Math.ceil(cjk*0.9 + other/3.6);   // 概算。実測で必ず上書きする
+}
+function convInputTokens(c){
+  const sys=$("sys").value.trim();
+  let t=estTokens(sys);
+  (c?c.msgs:[]).forEach(m=>{ if(m.role!=="error" && !m.dropped) t+=estTokens(m.text)+4; });
+  return t;
+}
+const fmtTok=n=>n>=1000?(n/1000).toFixed(1)+"k":String(Math.round(n||0));
+const fmtUsd=n=>n==null?"—":("$"+(n<0.01?n.toFixed(5):n.toFixed(4)));
+
+/* ===================== 単価 ===================== */
+function priceOf(prov,model){
+  const s=J(store.get(PRICE(prov,model)),null);
+  if(s&&(s.in!=null||s.out!=null))return s;
+  const p=S.modelPrices[model];
+  return p||null;
+}
+function costOf(prov,model,tin,tout){
+  const p=priceOf(prov,model);
+  if(!p||p.in==null||p.out==null)return null;
+  return (tin/1e6)*p.in + (tout/1e6)*p.out;
+}
+
+/* ===================== 使用量 ===================== */
+function addUsage(prov,model,tin,tout,estimated){
+  const u=S.usage, d=dayKey(), m=monthKey();
+  const cost=costOf(prov,model,tin,tout);
+  const bump=o=>{o.calls=(o.calls||0)+1;o.in=(o.in||0)+tin;o.out=(o.out||0)+tout;
+    if(cost!=null)o.cost=(o.cost||0)+cost; if(estimated)o.est=true;};
+  u.prov[prov]=u.prov[prov]||{}; bump(u.prov[prov]);
+  u.model[model]=u.model[model]||{}; bump(u.model[model]);
+  u.day[d]=u.day[d]||{}; bump(u.day[d]);
+  u.month[m]=u.month[m]||{}; bump(u.month[m]);
+  saveUsage(); renderUsage(); renderBudget(); updateBudgetBar();
+  return cost;
+}
+const todayUse =()=>S.usage.day[dayKey()]||{};
+const monthUse =()=>S.usage.month[monthKey()]||{};
+
+/* ===================== 予算 ===================== */
+const CAPS=["capReq","capDay","capMonth","capDayUsd","capMonthUsd"];
+CAPS.forEach(id=>{const el=$(id);el.value=store.get("bk2."+id)??"";
+  el.addEventListener("input",()=>{store.set("bk2."+id,el.value);renderBudget();updateBudgetBar();refreshPlan()})});
+const capVal=id=>{const v=parseFloat($(id).value);return isNaN(v)||v<=0?null:v};
+
+/* 上限判定。理由つきで返す */
+function budgetCheck(nextInputTok){
+  const d=todayUse(), m=monthUse();
+  const dTok=(d.in||0)+(d.out||0), mTok=(m.in||0)+(m.out||0);
+  const cReq=capVal("capReq"), cDay=capVal("capDay"), cMon=capVal("capMonth");
+  const cDayU=capVal("capDayUsd"), cMonU=capVal("capMonthUsd");
+  if(cReq!=null && nextInputTok>cReq)
+    return{block:true,msg:"1リクエストの入力上限を超えている（概算 "+fmtTok(nextInputTok)+" / 上限 "+fmtTok(cReq)+"）。古い発言を外すか上限を上げる。"};
+  if(cDay!=null && dTok>=cDay) return{block:true,msg:"本日のトークン上限に達した（"+fmtTok(dTok)+" / "+fmtTok(cDay)+"）。"};
+  if(cMon!=null && mTok>=cMon) return{block:true,msg:"今月のトークン上限に達した（"+fmtTok(mTok)+" / "+fmtTok(cMon)+"）。"};
+  if(cDayU!=null && (d.cost||0)>=cDayU) return{block:true,msg:"本日の概算金額の上限に達した（"+fmtUsd(d.cost||0)+" / $"+cDayU+"）。"};
+  if(cMonU!=null && (m.cost||0)>=cMonU) return{block:true,msg:"今月の概算金額の上限に達した（"+fmtUsd(m.cost||0)+" / $"+cMonU+"）。"};
+  const warns=[];
+  const near=(v,c,label,f)=>{ if(c!=null && v>=c*0.8) warns.push(label+" "+f(v)+" / "+f(c)+"（80%超）"); };
+  near(dTok,cDay,"本日",fmtTok); near(mTok,cMon,"今月",fmtTok);
+  near(d.cost||0,cDayU,"本日",fmtUsd); near(m.cost||0,cMonU,"今月",fmtUsd);
+  let remain=null;
+  if(cDay!=null)remain=cDay-dTok;
+  if(cMon!=null)remain=remain==null?cMon-mTok:Math.min(remain,cMon-mTok);
+  return{block:false,warn:warns.join(" / "),remain};
+}
+function updateBudgetBar(){
+  const b=$("budgetbar"), r=budgetCheck(convInputTokens(cur()));
+  if(r.block){ b.className="bar stop on"; b.textContent="送信停止：" + r.msg; }
+  else if(r.warn){ b.className="bar warn on"; b.textContent="上限が近い：" + r.warn; }
+  else b.className="bar";
+  const parts=[];
+  const d=todayUse();
+  parts.push("本日 "+fmtTok((d.in||0)+(d.out||0))+"tok"+(d.cost?" / "+fmtUsd(d.cost):""));
+  if(r.remain!=null) parts.push("残り "+fmtTok(Math.max(0,r.remain)));
+  $("todayinfo").textContent=parts.join(" · ");
+  return r;
+}
+function meter(label,val,cap,f){
+  const w=document.createElement("div"); w.style.marginBottom="12px";
+  const t=document.createElement("div"); t.className="tbl";
+  const r=document.createElement("div"); r.className="r"; r.style.borderBottom="0"; r.style.padding="0";
+  const a=document.createElement("span"); a.textContent=label;
+  const b=document.createElement("span"); b.textContent=f(val)+(cap!=null?" / "+f(cap):" / 上限なし");
+  r.append(a,b); t.appendChild(r); w.appendChild(t);
+  if(cap!=null){
+    const m=document.createElement("div"); m.className="meter";
+    const i=document.createElement("i");
+    const pct=Math.min(100,(val/cap)*100);
+    i.style.width=pct+"%"; if(pct>=100)i.className="d"; else if(pct>=80)i.className="w";
+    m.appendChild(i); w.appendChild(m);
+  }
+  return w;
+}
+function renderBudget(){
+  const box=$("budgetMeters"); box.innerHTML="";
+  const d=todayUse(), m=monthUse();
+  box.appendChild(meter("本日のトークン",(d.in||0)+(d.out||0),capVal("capDay"),fmtTok));
+  box.appendChild(meter("今月のトークン",(m.in||0)+(m.out||0),capVal("capMonth"),fmtTok));
+  box.appendChild(meter("本日の概算金額",d.cost||0,capVal("capDayUsd"),fmtUsd));
+  box.appendChild(meter("今月の概算金額",m.cost||0,capVal("capMonthUsd"),fmtUsd));
+  if((d.est||m.est)){
+    const n=document.createElement("div");n.className="hint warn";
+    n.textContent="実測トークンを返さない応答が含まれるため、一部は概算。";box.appendChild(n);
+  }
+}
+$("resetDay").addEventListener("click",()=>{if(!confirm("本日分の記録を消す？"))return;
+  delete S.usage.day[dayKey()];saveUsage();renderBudget();renderUsage();updateBudgetBar()});
+$("resetMonth").addEventListener("click",()=>{if(!confirm("今月分の記録を消す？"))return;
+  delete S.usage.month[monthKey()];saveUsage();renderBudget();renderUsage();updateBudgetBar()});
+
+/* 単価欄 */
+["priceIn","priceOut"].forEach(id=>$(id).addEventListener("input",()=>{
+  const m=curModelName(); if(!m)return;
+  const v={in:parseFloat($("priceIn").value),out:parseFloat($("priceOut").value)};
+  store.set(PRICE(S.prov,m),JSON.stringify({in:isNaN(v.in)?null:v.in,out:isNaN(v.out)?null:v.out}));
+  renderBudget();refreshPlan();
+}));
+function syncPriceFields(){
+  const m=curModelName(); const p=m?priceOf(S.prov,m):null;
+  $("priceIn").value=p&&p.in!=null?p.in:"";
+  $("priceOut").value=p&&p.out!=null?p.out:"";
+  const src=$("priceSrc");
+  if(!m){src.className="hint";src.textContent="モデル未選択。";}
+  else if(p&&p.src==="api"){src.className="hint ok";src.textContent=m+"：一覧APIから取得した単価。";}
+  else if(p){src.className="hint";src.textContent=m+"：手入力した単価。";}
+  else{src.className="hint warn";src.textContent=m+"：単価が不明。手入力しないと金額は計算されない。";}
+}
+
+/* ===================== 自動選択 ===================== */
+$("autoMode").value=store.get("bk2.autoMode")||"off";
+$("autoMode").addEventListener("change",e=>{store.set("bk2.autoMode",e.target.value);syncAutoHint();refreshPlan()});
+function syncAutoHint(){
+  const v=$("autoMode").value, h=$("autoHint");
+  if(v==="off")h.textContent="自動選択を使わない。「接続」タブのモデルを常に使う。";
+  else if(v==="local")h.textContent="ブラウザ内のルールだけで判定する。追加コストゼロ、即時。精度は粗い。";
+  else h.textContent="40文字以上の入力のとき、ルーターモデルに1回だけ難易度を尋ねる。この判定にもトークンを消費し、使用量に計上される。";
+}
+function tierModel(t){ return store.get(TIER(S.prov,t))||""; }
+
+/* ローカル判定：根拠を必ず返す */
+function localTier(text,c){
+  const why=[];
+  let score=0;
+  if(/```|<\/?[a-z]+>|function |const |def |import |SELECT |\{\s*$/m.test(text)){score+=2;why.push("コード様式を検出")}
+  const n=text.length;
+  if(n>600){score+=2;why.push("入力が長い("+n+"字)")}
+  else if(n>160){score+=1;why.push("入力が中程度("+n+"字)")}
+  else why.push("入力が短い("+n+"字)");
+  if(/証明|設計|アーキ|最適化|リファクタ|分析|論証|比較検討|戦略|なぜ|理由を/.test(text)){score+=2;why.push("推論を要する語")}
+  if(/翻訳|要約|言い換え|校正|誤字|フォーマット|表にして/.test(text)){score-=1;why.push("定型変換の語")}
+  const hist=(c?c.msgs.filter(m=>m.role!=="error"&&!m.dropped).length:0);
+  if(hist>=10){score+=1;why.push("履歴が長い("+hist+"通)")}
+  const tier=score>=3?"heavy":score>=1?"mid":"light";
+  return{tier,why:why.join("、"),score};
+}
+
+/* ルーター：最安モデルに1〜3で答えさせる */
+async function routerTier(text){
+  const rm=tierModel("router");
+  if(!rm)return null;
+  const P=PROVIDERS[S.prov], key=($("key").value||"").trim();
+  const body=buildBody(S.prov,rm,
+    [{role:"user",text:"次の依頼の難易度を1(軽い)/2(中)/3(重い)で答えろ。数字1文字のみ、説明禁止。\n---\n"+text.slice(0,1200)}],
+    "",false,16);
+  const r=await call(P.chat,{method:"POST",headers:P.head(key),body:JSON.stringify(body)});
+  if(!r.ok)throw new Error("router HTTP "+r.status);
+  const j=await r.json();
+  let out="", tin=0, tout=0;
+  if(P.shape==="anthropic"){
+    out=(j.content||[]).map(x=>x.text||"").join("");
+    tin=j.usage?.input_tokens||0; tout=j.usage?.output_tokens||0;
+  }else{
+    out=j.choices?.[0]?.message?.content||"";
+    tin=j.usage?.prompt_tokens||0; tout=j.usage?.completion_tokens||0;
+  }
+  const est=!(tin||tout);
+  if(est){tin=estTokens(text.slice(0,1200));tout=2}
+  noteNet(tin,tout);
+  addUsage(S.prov,rm,tin,tout,est);          // 判定コストも必ず計上
+  const d=(out.match(/[123]/)||[])[0];
+  if(!d)return null;
+  return{tier:d==="3"?"heavy":d==="2"?"mid":"light",why:"ルーター("+rm+")の判定 "+d,cost:{tin,tout}};
+}
+
+/* 送信前の計画表示 */
+function refreshPlan(){
+  const box=$("plan"); box.innerHTML="";
+  const text=$("input").value.trim();
+  const c=cur();
+  const inTok=convInputTokens(c)+estTokens(text);
+  const mode=$("autoMode").value;
+  let model=curModelName(), why="手動選択";
+  if(mode!=="off"&&text){
+    const lt=localTier(text,c);
+    const tm=tierModel(lt.tier);
+    if(tm){model=tm;why=(mode==="router"&&text.length>=40?"暫定：":"")+({light:"軽い",mid:"中",heavy:"重い"}[lt.tier])+"（"+lt.why+"）"}
+    else why="段階「"+({light:"軽い",mid:"中",heavy:"重い"}[lt.tier])+"」にモデル未割当。手動のモデルを使う";
+  }
+  S.lastPlan={model,why};
+  const cost=costOf(S.prov,model,inTok,parseInt($("maxtok").value,10)||0);
+  const a=document.createElement("span");a.className="pick";a.textContent=model||"モデル未選択";
+  const b=document.createElement("span");b.className="why";b.textContent="← "+why;
+  const d=document.createElement("span");d.style.marginLeft="auto";
+  d.textContent="入力概算 "+fmtTok(inTok)+"tok"+(cost!=null?" / 最大 "+fmtUsd(cost):"");
+  box.append(a,b,d);
+  const r=updateBudgetBar();
+  $("send").disabled = r.block || S.busy && false;
+  if(r.block)$("send").disabled=true;
+}
+
+/* ===================== モデル一覧 ===================== */
+function curModelName(){ return store.get(MD(S.prov))||""; }
+function setModel(m){ if(!m)return; store.set(MD(S.prov),m);
+  $("modellbl").textContent=m; $("mname").textContent=m;
+  const r=J(store.get(RC(S.prov)),[]).filter(x=>x!==m); r.unshift(m);
+  store.set(RC(S.prov),JSON.stringify(r.slice(0,8)));
+  syncPriceFields(); refreshPlan();
+}
+async function loadModels(force){
+  const P=PROVIDERS[S.prov], key=($("key").value||"").trim();
+  const cached=J(store.get(MC(S.prov)),null);
+  if(cached&&cached.list){
+    S.models=cached.list; S.modelPrices=cached.prices||{};
+    const age=Date.now()-(cached.at||0);
+    $("modelhint").className="hint";
+    $("modelhint").textContent=S.models.length+"件（"+Math.floor(age/3600000)+"時間前に取得）";
+    if(age<CACHE_MS&&!force){syncPriceFields();return}
+  }
+  if(!key){ if(!cached){S.models=[];$("modelhint").className="hint";
+    $("modelhint").textContent="キーを入れると一覧を取得する。入れなくても直接入力で使える。"} return; }
+  $("modelhint").className="hint"; $("modelhint").textContent="取得中…";
+  try{
+    const r=await call(P.models,{headers:P.head(key)});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const j=await r.json();
+    const raw=Array.isArray(j)?j:(j.data||j.models||[]);
+    const list=[], prices={};
+    for(const it of raw){
+      if(!it||typeof it!=="object")continue;
+      const id=it.id||it.name||it.model;
+      if(typeof id!=="string"||!id)continue;
+      list.push(id);
+      // 価格の在り方はプロバイダごとに違う。取れなければ無理に埋めない。
+      const p=it.pricing||it.price;
+      if(p){
+        const pin=parseFloat(p.prompt??p.input??p.input_token_price);
+        const pout=parseFloat(p.completion??p.output??p.output_token_price);
+        if(!isNaN(pin)&&!isNaN(pout)){
+          // OpenRouterは「1トークンあたりUSD」で返すため100万倍する
+          const scale = (pin<0.001)?1e6:1;
+          prices[id]={in:pin*scale,out:pout*scale,src:"api"};
+        }
+      }
+    }
+    if(!list.length)throw new Error("一覧が空");
+    S.models=list.sort(); S.modelPrices=prices;
+    store.set(MC(S.prov),JSON.stringify({at:Date.now(),list:S.models,prices}));
+    const np=Object.keys(prices).length;
+    $("modelhint").className="hint ok";
+    $("modelhint").textContent=S.models.length+"件取得。"+(np?np+"件は単価つき。":"単価は返らなかったので手入力が要る。");
+  }catch(e){
+    S.models=cached?.list||[];
+    $("modelhint").className="hint bad";
+    $("modelhint").textContent="取得できなかった（"+String(e.message||e).slice(0,50)+"）。モデル名は直接入力すれば使える。";
+  }
+  syncPriceFields();
+}
+$("refresh").addEventListener("click",()=>loadModels(true));
+
+/* モデルピッカー（接続タブ用と段階割当用を兼ねる） */
+function openMP(target){ S.mpTarget=target; $("mp").className="on"; $("mpq").value=""; renderMP(""); setTimeout(()=>$("mpq").focus(),60); }
+$("modelbtn").addEventListener("click",()=>openMP("main"));
+document.querySelectorAll(".tierpick").forEach(b=>b.addEventListener("click",()=>openMP(b.dataset.tier)));
+$("mpclose").addEventListener("click",()=>$("mp").className="");
+$("mpq").addEventListener("input",e=>renderMP(e.target.value.trim()));
+$("mpq").addEventListener("keydown",e=>{if(e.key==="Enter"){const v=e.target.value.trim();if(v)choose(v)}});
+function choose(m){
+  if(S.mpTarget==="main")setModel(m);
+  else{ store.set(TIER(S.prov,S.mpTarget),m); syncTiers(); refreshPlan(); }
+  $("mp").className="";
+}
+function renderMP(q){
+  const box=$("mplist"); box.innerHTML="";
+  const ql=q.toLowerCase();
+  const recent=J(store.get(RC(S.prov)),[]);
+  const now=S.mpTarget==="main"?curModelName():tierModel(S.mpTarget);
+  if(q&&!S.models.includes(q)) box.appendChild(mrow(q,"直接入力",()=>choose(q)));
+  recent.filter(m=>!ql||m.toLowerCase().includes(ql)).forEach(m=>box.appendChild(mrow(m,"最近",()=>choose(m),m===now)));
+  const hit=S.models.filter(m=>(!ql||m.toLowerCase().includes(ql))&&!recent.includes(m));
+  if(!hit.length&&!recent.length&&!q){
+    const d=document.createElement("div");d.className="hint";
+    d.textContent="一覧が空。上の欄にモデル名を打ってEnterで使える。";box.appendChild(d);
+  }
+  hit.slice(0,400).forEach(m=>{
+    const p=S.modelPrices[m];
+    box.appendChild(mrow(m,p?("$"+p.in+"/"+p.out):"",()=>choose(m),m===now));
+  });
+}
+function mrow(text,tag,fn,on){
+  const d=document.createElement("div");d.className="mrow"+(on?" on":"");d.tabIndex=0;d.setAttribute("role","button");
+  const s=document.createElement("span");s.style.cssText="flex:1;min-width:0";s.textContent=text;d.appendChild(s);
+  if(tag){const t=document.createElement("span");t.className="tagr";t.textContent=tag;d.appendChild(t)}
+  d.addEventListener("click",fn); d.addEventListener("keydown",e=>{if(e.key==="Enter")fn()});
+  return d;
+}
+function syncTiers(){
+  document.querySelectorAll(".tierpick").forEach(b=>{
+    b.querySelector("span").textContent = tierModel(b.dataset.tier) || "未設定";
+  });
+}
+
+/* ===================== プロバイダ切替 ===================== */
+(function(){const s=$("prov");for(const[k,v]of Object.entries(PROVIDERS)){
+  const o=document.createElement("option");o.value=k;o.textContent=v.name;s.appendChild(o)}s.value=S.prov})();
+function syncProv(){
+  const P=PROVIDERS[S.prov];
+  $("key").value=store.get(K(S.prov))||"";
+  $("provhint").textContent=P.hint;
+  $("pname").textContent=P.name; $("pdot").style.background=P.color;
+  const m=curModelName(); $("modellbl").textContent=m||"未選択"; $("mname").textContent=m||"モデル未選択";
+  $("teststat").textContent=""; $("teststat").className="hint";
+  store.set("bk2.prov",S.prov);
+  syncTiers(); loadModels(false); syncPriceFields(); refreshPlan();
+}
+$("prov").addEventListener("change",e=>{S.prov=e.target.value;syncProv()});
+$("key").addEventListener("input",e=>store.set(K(S.prov),e.target.value.trim()));
+$("forget").addEventListener("click",()=>{
+  if(!confirm(PROVIDERS[S.prov].name+" のキーを消す？"))return;
+  store.del(K(S.prov));$("key").value="";
+  $("teststat").className="hint";$("teststat").textContent="消した。";
+});
+["sys","temp","maxtok"].forEach(id=>{const el=$(id);
+  el.value=store.get("bk2."+id)??el.value;
+  el.addEventListener("input",()=>{store.set("bk2."+id,el.value);refreshPlan()})});
+
+/* ===================== シート ===================== */
+function openSheet(p){ if(p)switchTab(p); $("sheet").classList.add("on"); $("scrim").classList.add("on"); }
+function closeSheet(){ $("sheet").classList.remove("on"); $("scrim").classList.remove("on"); }
+$("openbtn").addEventListener("click",()=>openSheet());
+$("scrim").addEventListener("click",closeSheet);
+function switchTab(p){
+  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.p===p));
+  document.querySelectorAll(".pane").forEach(x=>x.classList.toggle("on",x.id==="pane-"+p));
+  if(p==="usage")renderUsage(); if(p==="budget")renderBudget();
+}
+document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.p)));
+
+/* ===================== 会話 ===================== */
+function newConv(){
+  const c={id:uid(),title:"無題",msgs:[],at:Date.now(),use:{in:0,out:0,cost:0}};
+  S.convs.unshift(c);S.active=c.id;store.set("bk2.active",c.id);
+  saveConvs();renderConvs();renderLog();refreshPlan();return c;
+}
+$("newbtn").addEventListener("click",()=>{newConv();closeSheet()});
+$("newconv").addEventListener("click",()=>{newConv();closeSheet()});
+$("renameconv").addEventListener("click",()=>{const c=cur();if(!c)return;
+  const t=prompt("会話の名前",c.title);if(t===null)return;c.title=t.trim()||"無題";saveConvs();renderConvs()});
+function dl(name,text,type){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+$("exportMd").addEventListener("click",()=>{
+  const c=cur();if(!c||!c.msgs.length){alert("書き出す内容がない。");return}
+  const md="# "+c.title+"\n\n"+c.msgs.map(m=>{
+    const h="## "+(m.role==="user"?"自分":m.role==="error"?"エラー":"AI")+(m.model?" — "+m.model:"");
+    const u=m.usage?"\n\n`in "+m.usage.in+" / out "+m.usage.out+(m.usage.est?" (概算)":"")+
+      (m.usage.cost!=null?" / "+fmtUsd(m.usage.cost):"")+"`":"";
+    return h+u+"\n\n"+m.text;
+  }).join("\n\n");
+  dl(c.title.replace(/[\\/:*?"<>|]/g,"_").slice(0,50)+".md",md,"text/markdown;charset=utf-8");
+});
+$("exportAll").addEventListener("click",()=>{
+  dl("byok-console-backup-"+dayKey()+".json",
+     JSON.stringify({v:2,at:Date.now(),convs:S.convs,usage:S.usage},null,2),"application/json");
+});
+$("importFile").addEventListener("change",e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    const d=J(r.result,null);
+    if(!d||!Array.isArray(d.convs)){alert("読み込めなかった。形式が違う。");return}
+    const ids=new Set(S.convs.map(c=>c.id));
+    let n=0; d.convs.forEach(c=>{if(!ids.has(c.id)){S.convs.push(c);n++}});
+    saveConvs();renderConvs();alert(n+"件の会話を追加した。");
+  };
+  r.readAsText(f); e.target.value="";
+});
+function renderConvs(){
+  const box=$("convlist");box.innerHTML="";
+  if(!S.convs.length){const d=document.createElement("div");d.className="hint";d.textContent="まだ会話がない。";box.appendChild(d);return}
+  S.convs.forEach(c=>{
+    const el=document.createElement("div");el.className="item"+(c.id===S.active?" on":"");
+    const t=document.createElement("div");t.className="t";t.textContent=c.title;
+    const s=document.createElement("div");s.className="s";
+    s.innerHTML=c.msgs.length+"通<br>"+fmtTok((c.use?.in||0)+(c.use?.out||0))+"tok";
+    const x=document.createElement("button");x.className="mini";x.textContent="削除";
+    x.addEventListener("click",ev=>{ev.stopPropagation();
+      if(!confirm("「"+c.title+"」を消す？戻せない。"))return;
+      S.convs=S.convs.filter(v=>v.id!==c.id);
+      if(S.active===c.id){S.active=S.convs[0]?.id||null;store.set("bk2.active",S.active||"")}
+      saveConvs();renderConvs();renderLog();refreshPlan()});
+    el.addEventListener("click",()=>{S.active=c.id;store.set("bk2.active",c.id);
+      renderConvs();renderLog();refreshPlan();closeSheet()});
+    el.append(t,s,x);box.appendChild(el);
+  });
+}
+
+/* ===================== ログ ===================== */
+function msgEl(m,idx){
+  const d=document.createElement("div");
+  d.className="msg "+(m.role==="user"?"user":m.role==="error"?"error":"assistant")+(m.dropped?" dropped":"");
+  const w=document.createElement("div");w.className="who";
+  const a=document.createElement("span");a.textContent=m.role==="user"?"自分":m.role==="error"?"失敗":"AI";w.appendChild(a);
+  if(m.model){const s=document.createElement("span");s.className="meta";s.textContent=m.model;w.appendChild(s)}
+  if(m.why){const s=document.createElement("span");s.className="meta";s.textContent="判定: "+m.why;w.appendChild(s)}
+  if(m.usage){const s=document.createElement("span");s.className="meta"+(m.usage.est?" est":"");
+    s.textContent="in "+m.usage.in+" / out "+m.usage.out+(m.usage.est?"（概算）":"")+
+      (m.usage.cost!=null?" · "+fmtUsd(m.usage.cost):"");w.appendChild(s)}
+  if(m.dropped){const s=document.createElement("span");s.className="meta";s.textContent="送信対象外";w.appendChild(s)}
+  const b=document.createElement("div");b.className="body";b.textContent=m.text;
+  d.append(w,b);
+  if(m.raw){const dt=document.createElement("details");dt.className="raw";
+    const sm=document.createElement("summary");sm.textContent="サーバーの返答（原文）";
+    const pre=document.createElement("pre");pre.textContent=m.raw;dt.append(sm,pre);d.appendChild(dt)}
+  if(m.role!=="error"&&m.text){
+    const act=document.createElement("div");act.className="act";
+    const cp=document.createElement("button");cp.className="mini";cp.textContent="コピー";
+    cp.addEventListener("click",()=>{navigator.clipboard?.writeText(m.text);
+      cp.textContent="コピーした";setTimeout(()=>cp.textContent="コピー",1200)});
+    act.appendChild(cp);
+    if(idx!=null){
+      const tg=document.createElement("button");tg.className="mini";tg.textContent=m.dropped?"送信対象に戻す":"送信対象から外す";
+      tg.addEventListener("click",()=>{m.dropped=!m.dropped;saveConvs();renderLog();refreshPlan();renderUsage()});
+      act.appendChild(tg);
+    }
+    d.appendChild(act);
+  }
+  return d;
+}
+function renderLog(){
+  const c=cur(),box=$("stream");box.innerHTML="";
+  $("intro").style.display=(c&&c.msgs.length)?"none":"block";
+  if(c)c.msgs.forEach((m,i)=>box.appendChild(msgEl(m,i)));
+  $("ctx").textContent="履歴 "+(c?c.msgs.filter(m=>m.role!=="error"&&!m.dropped).length:0)+" 通";
+  $("log").scrollTop=$("log").scrollHeight;
+}
+const nearBottom=()=>{const l=$("log");return l.scrollHeight-l.scrollTop-l.clientHeight<150};
+
+/* ===================== 使用量パネル ===================== */
+function tblRows(box,obj,fmtName){
+  box.innerHTML="";
+  const ks=Object.keys(obj);
+  if(!ks.length){const d=document.createElement("div");d.className="hint";d.textContent="記録なし";box.appendChild(d);return}
+  ks.sort((a,b)=>((obj[b].in||0)+(obj[b].out||0))-((obj[a].in||0)+(obj[a].out||0)));
+  ks.slice(0,30).forEach(k=>{
+    const v=obj[k];const r=document.createElement("div");r.className="r";
+    const a=document.createElement("span");a.textContent=fmtName?fmtName(k):k;
+    const b=document.createElement("span");
+    b.textContent=(v.calls||0)+"回 "+fmtTok(v.in)+"↓ "+fmtTok(v.out)+"↑"+(v.cost!=null?" "+fmtUsd(v.cost):"")+(v.est?" *":"");
+    r.append(a,b);box.appendChild(r);
+  });
+}
+function renderUsage(){
+  const d=todayUse(),m=monthUse();
+  const t=$("usageTotals");t.innerHTML="";
+  [["本日",d],["今月",m]].forEach(([lab,v])=>{
+    const r=document.createElement("div");r.className="r";
+    const a=document.createElement("span");a.textContent=lab;
+    const b=document.createElement("span");
+    b.textContent=(v.calls||0)+"回 "+fmtTok(v.in)+"↓ "+fmtTok(v.out)+"↑"+(v.cost?" "+fmtUsd(v.cost):"");
+    r.append(a,b);t.appendChild(r);
+  });
+  tblRows($("usageByProv"),S.usage.prov,k=>PROVIDERS[k]?.name||k);
+  tblRows($("usageByModel"),S.usage.model);
+  const c=cur(),cu=$("usageConv");cu.innerHTML="";
+  if(c){
+    const rows=[["累計 in/out",fmtTok(c.use?.in||0)+" / "+fmtTok(c.use?.out||0)],
+      ["累計 概算金額",c.use?.cost?fmtUsd(c.use.cost):"—"],
+      ["次回送信の入力概算",fmtTok(convInputTokens(c))+" tok"],
+      ["うち履歴が占める分",fmtTok(convInputTokens(c)-estTokens($("sys").value.trim()))+" tok"]];
+    rows.forEach(([a,b])=>{const r=document.createElement("div");r.className="r";
+      const x=document.createElement("span");x.textContent=a;
+      const y=document.createElement("span");y.textContent=b;r.append(x,y);cu.appendChild(r)});
+    const dropped=c.msgs.filter(m=>m.dropped);
+    const saved=dropped.reduce((s,m)=>s+estTokens(m.text)+4,0);
+    $("ctxWarn").className="hint"+(saved?" ok":"");
+    $("ctxWarn").textContent=dropped.length
+      ? dropped.length+"通を送信対象から外していて、毎回 約"+fmtTok(saved)+"トークンを節約している。"
+      : "会話が伸びると毎回の入力トークンが増える。古い発言を外すと削減できる。";
+  }
+  const anyEst=Object.values(S.usage.model).some(v=>v.est);
+  if(anyEst){const n=document.createElement("div");n.className="hint warn";
+    n.textContent="* 実測を返さない応答を含む。その分は概算。";$("usageByModel").appendChild(n)}
+}
+$("dropOld").addEventListener("click",()=>{
+  const c=cur();if(!c)return;
+  const keep=6; const live=c.msgs.filter(m=>m.role!=="error");
+  live.slice(0,Math.max(0,live.length-keep)).forEach(m=>m.dropped=true);
+  saveConvs();renderLog();renderUsage();refreshPlan();
+});
+$("dropUndo").addEventListener("click",()=>{
+  const c=cur();if(!c)return;c.msgs.forEach(m=>delete m.dropped);
+  saveConvs();renderLog();renderUsage();refreshPlan();
+});
+
+/* ===================== リクエスト ===================== */
+function buildBody(prov,model,msgs,sys,stream,maxOverride){
+  const t=parseFloat($("temp").value);
+  const mt=maxOverride??parseInt($("maxtok").value,10);
+  if(PROVIDERS[prov].shape==="anthropic"){
+    const b={model,max_tokens:isNaN(mt)?4096:mt,stream,messages:msgs.map(m=>({role:m.role,content:m.text}))};
+    if(sys)b.system=sys; if(!isNaN(t))b.temperature=Math.min(t,1);
+    return b;
+  }
+  const list=sys?[{role:"system",content:sys}]:[];
+  msgs.forEach(m=>list.push({role:m.role,content:m.text}));
+  const b={model,messages:list,stream};
+  if(!isNaN(mt))b.max_tokens=mt; if(!isNaN(t))b.temperature=t;
+  if(stream)b.stream_options={include_usage:true};
+  return b;
+}
+function blockedMsg(prov){
+  return "ブラウザに止められた。ほぼCORS。\n\n"+
+  "・"+PROVIDERS[prov].name+" がブラウザからの直接呼び出しを許していない可能性が高い。\n"+
+  "・開発者ツールのコンソールに Access-Control-Allow-Origin が無い旨のエラーが出ていれば確定。\n"+
+  "・OpenRouterに切り替えれば同じモデルを叩ける。中継サーバーを立てるのは、キーの管理責任が増えるので勧めない。";
+}
+
+async function send(){
+  if(S.busy)return;
+  const text=$("input").value.trim(); if(!text)return;
+  const prov=S.prov,P=PROVIDERS[prov];
+  const key=($("key").value||"").trim();
+  if(!key){openSheet("conn");$("teststat").className="hint bad";$("teststat").textContent="キーが空。";return}
+
+  let c=cur()||newConv();
+
+  /* --- 上限チェック（送信前・実際に止める） --- */
+  const preTok=convInputTokens(c)+estTokens(text);
+  const bc=budgetCheck(preTok);
+  if(bc.block){ openSheet("budget"); updateBudgetBar(); return; }
+
+  /* --- モデル決定 --- */
+  let model=curModelName(), why="手動選択";
+  const mode=$("autoMode").value;
+  if(mode!=="off"){
+    const lt=localTier(text,c);
+    let tier=lt.tier, w=lt.why;
+    if(mode==="router" && text.length>=40){
+      try{ const rr=await routerTier(text); if(rr){tier=rr.tier;w=rr.why} else w=lt.why+"（ルーター失敗→ローカル判定）"; }
+      catch(e){ w=lt.why+"（ルーター呼び出し失敗→ローカル判定）"; }
+    }
+    const tm=tierModel(tier);
+    if(tm){model=tm;why=({light:"軽い",mid:"中",heavy:"重い"}[tier])+"："+w}
+    else why="段階未割当のため手動モデル："+w;
+  }
+  if(!model){openSheet("conn");openMP("main");return}
+
+  c.msgs.push({role:"user",text});
+  if(c.title==="無題")c.title=text.slice(0,26).replace(/\n/g," ")+(text.length>26?"…":"");
+  $("input").value="";autosize();saveConvs();renderConvs();renderLog();
+
+  S.busy=true;$("send").textContent="停止";$("send").classList.add("stop");$("send").disabled=false;
+  S.abort=new AbortController();
+
+  const hold={role:"assistant",text:"",model,why};
+  const el=msgEl(hold),bodyEl=el.querySelector(".body");
+  const cs=document.createElement("span");cs.className="cursor";bodyEl.appendChild(cs);
+  $("stream").appendChild(el);$("intro").style.display="none";
+  $("log").scrollTop=$("log").scrollHeight;
+
+  try{
+    const sendMsgs=c.msgs.filter(m=>m.role!=="error"&&!m.dropped);
+    const res=await call(P.chat,{method:"POST",headers:P.head(key),
+      body:JSON.stringify(buildBody(prov,model,sendMsgs,$("sys").value.trim(),true)),
+      signal:S.abort.signal});
+    if(!res.ok){
+      const t=await res.text();
+      let msg="HTTP "+res.status+"：";
+      if(res.status===401)msg+="キーが違うか権限がない。"+(prov==="anthropic"?"（専用ヘッダは自動で付けている）":"");
+      else if(res.status===404)msg+="そのモデル名が存在しない。一覧を更新するか名前を確認。";
+      else if(res.status===429)msg+="レート上限か残高不足。";
+      else if(res.status>=500)msg+="相手側の障害。少し待って再送。";
+      else msg+="リクエストが受理されなかった。";
+      const e=new Error(msg);e.raw=t.slice(0,2000);throw e;
+    }
+    const usage=await readStream(res,prov,ch=>{
+      hold.text+=ch;bodyEl.textContent=hold.text;bodyEl.appendChild(cs);
+      if(nearBottom())$("log").scrollTop=$("log").scrollHeight;
+    });
+    cs.remove();
+    if(!hold.text)hold.text="(空の応答が返ってきた)";
+    let tin,tout,est=false;
+    if(usage&&(usage.in||usage.out)){tin=usage.in;tout=usage.out}
+    else{tin=preTok;tout=estTokens(hold.text);est=true}
+    noteNet(tin,tout);
+    const cost=addUsage(prov,model,tin,tout,est);
+    hold.usage={in:tin,out:tout,est,cost};
+    c.use=c.use||{in:0,out:0,cost:0};
+    c.use.in+=tin;c.use.out+=tout;if(cost!=null)c.use.cost=(c.use.cost||0)+cost;
+    c.msgs.push(hold);
+  }catch(err){
+    cs.remove();el.remove();
+    if(err.name==="AbortError"){ if(hold.text)c.msgs.push(hold); }
+    else{
+      const isNet=/Failed to fetch|NetworkError|Load failed/i.test(String(err.message||err));
+      c.msgs.push({role:"error",text:isNet?blockedMsg(prov):String(err.message||err),raw:err.raw});
+    }
+  }finally{
+    S.busy=false;$("send").textContent="送信";$("send").classList.remove("stop");
+    S.abort=null;c.at=Date.now();saveConvs();renderConvs();renderLog();renderUsage();refreshPlan();
+  }
+}
+async function readStream(res,prov,onChunk){
+  const shape=PROVIDERS[prov].shape;
+  const rd=res.body.getReader(),dec=new TextDecoder();
+  let buf="",usage=null;
+  while(true){
+    const{done,value}=await rd.read(); if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    const lines=buf.split("\n"); buf=lines.pop();
+    for(const raw of lines){
+      const line=raw.trim(); if(!line.startsWith("data:"))continue;
+      const data=line.slice(5).trim(); if(!data||data==="[DONE]")continue;
+      let j;try{j=JSON.parse(data)}catch(e){continue}
+      if(shape==="anthropic"){
+        if(j.type==="content_block_delta"&&typeof j.delta?.text==="string")onChunk(j.delta.text);
+        if(j.type==="message_start"&&j.message?.usage)usage={in:j.message.usage.input_tokens||0,out:0};
+        if(j.type==="message_delta"&&j.usage)usage={in:usage?.in||0,out:j.usage.output_tokens||0};
+        if(j.type==="error")throw new Error(JSON.stringify(j.error));
+      }else{
+        const d=j.choices?.[0]?.delta;
+        if(d&&typeof d.content==="string"&&d.content)onChunk(d.content);
+        if(j.usage)usage={in:j.usage.prompt_tokens||0,out:j.usage.completion_tokens||0};
+        if(j.error)throw new Error(JSON.stringify(j.error));
+      }
+    }
+  }
+  return usage;
+}
+
+/* ===================== 接続テスト ===================== */
+$("test").addEventListener("click",async()=>{
+  const P=PROVIDERS[S.prov],key=($("key").value||"").trim(),model=curModelName();
+  const st=$("teststat");
+  if(!key){st.className="hint bad";st.textContent="キーが空。";return}
+  if(!model){st.className="hint bad";st.textContent="モデルが未選択。";return}
+  st.className="hint";st.textContent="試している…";
+  try{
+    const r=await call(P.chat,{method:"POST",headers:P.head(key),
+      body:JSON.stringify(buildBody(S.prov,model,[{role:"user",text:"ping"}],"",false,8))});
+    const t=await r.text();
+    if(r.ok){st.className="hint ok";st.textContent="通った。CORSの壁はない。（このテストも数トークン消費している）";
+      try{const j=JSON.parse(t);const u=j.usage||{};
+        const tin=u.prompt_tokens??u.input_tokens??2, tout=u.completion_tokens??u.output_tokens??1;
+        noteNet(tin,tout); addUsage(S.prov,model,tin,tout,!(u.prompt_tokens||u.input_tokens));}catch(e){}
+    }
+    else{st.className="hint bad";st.textContent="サーバーは応答したがエラー: HTTP "+r.status+" — "+t.slice(0,140)}
+  }catch(e){
+    st.className="hint bad";
+    st.textContent="ブラウザに止められた（ほぼCORS）。このプロバイダは直叩き不可の可能性。OpenRouter経由なら同じモデルを叩ける。";
+  }
+});
+
+/* ===================== 入力 ===================== */
+function autosize(){const t=$("input");t.style.height="auto";
+  t.style.height=Math.min(t.scrollHeight,Math.round(innerHeight*0.32))+"px"}
+let planTimer=null;
+$("input").addEventListener("input",()=>{autosize();
+  clearTimeout(planTimer);planTimer=setTimeout(refreshPlan,180)});
+$("input").addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){e.preventDefault();send()}});
+$("send").addEventListener("click",()=>{ if(S.busy&&S.abort){S.abort.abort();return} send(); });
+addEventListener("keydown",e=>{if(e.key==="Escape"){if($("mp").className==="on")$("mp").className="";else closeSheet()}});
+
+/* ===================== 起動 ===================== */
+syncAutoHint();
+syncProv();
+if(!S.convs.length)newConv();
+if(!cur()){S.active=S.convs[0].id;store.set("bk2.active",S.active)}
+renderConvs();renderLog();renderUsage();renderBudget();renderNet();autosize();refreshPlan();
+</script>
+</body>
+</html>
