@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>鍵持ち込みコンソール</title>
+<style>
+:root{
+  --bg:#EAECE8; --panel:#F5F6F3; --line:#C7CCC5; --line-2:#DDE1DA;
+  --ink:#151C19; --dim:#5A6660;
+  --pine:#2E5C4F; --pine-bg:#DCE7E1;
+  --rust:#A2432A; --rust-bg:#F5E6DF;
+  --mono: ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans: system-ui,-apple-system,"Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
+  --sheet-h: 78dvh;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121614; --panel:#1A211E; --line:#2E3A35; --line-2:#232C28;
+    --ink:#DFE5E1; --dim:#8A968F;
+    --pine:#6FBFA3; --pine-bg:#1D302A;
+    --rust:#E08668; --rust-bg:#2E1F1A;
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overscroll-behavior:none}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--sans);
+  font-size:16px; line-height:1.7; -webkit-text-size-adjust:100%;
+}
+button,input,select,textarea{font-family:inherit;font-size:16px;color:var(--ink)}
+button{cursor:pointer}
+
+#app{display:flex;flex-direction:column;height:100dvh;min-height:0}
+
+/* ---------- header ---------- */
+header{
+  display:flex;align-items:center;gap:8px;padding:10px 12px;
+  padding-top:calc(10px + env(safe-area-inset-top));
+  background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto;
+}
+.hbtn{
+  min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;
+  background:transparent;border:1px solid transparent;border-radius:3px;font-size:19px;color:var(--dim);
+}
+.hbtn:active{background:var(--line-2)}
+#hid{flex:1;min-width:0;font-family:var(--mono);font-size:12px;line-height:1.35}
+#hid .p{display:flex;align-items:center;gap:6px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+#hid .m{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:0 0 auto}
+
+/* ---------- notice ---------- */
+#notice{display:none;padding:8px 14px;background:var(--rust-bg);color:var(--rust);
+  font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--rust)}
+#notice.on{display:block}
+
+/* ---------- log ---------- */
+#log{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 14px 6px;min-height:0}
+.wrap{max-width:720px;margin:0 auto}
+.msg{margin-bottom:22px}
+.who{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:5px;display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.who .meta{letter-spacing:0;text-transform:none;opacity:.8}
+.body{white-space:pre-wrap;word-break:break-word;font-size:15.5px}
+.msg.user .body{background:var(--panel);border:1px solid var(--line-2);border-left:3px solid var(--ink);
+  padding:10px 12px;border-radius:3px}
+.msg.assistant .body{border-left:3px solid var(--pine);padding:1px 0 1px 12px}
+.msg.error .body{border-left:3px solid var(--rust);background:var(--rust-bg);color:var(--rust);
+  padding:10px 12px;font-family:var(--mono);font-size:12.5px;border-radius:3px}
+.msg .act{margin-top:6px;display:flex;gap:6px}
+.mini{background:transparent;border:1px solid var(--line);border-radius:3px;color:var(--dim);
+  font-family:var(--mono);font-size:11px;padding:5px 9px;min-height:32px}
+.mini:active{background:var(--line-2)}
+details.raw{margin-top:8px;font-family:var(--mono);font-size:11px}
+details.raw pre{white-space:pre-wrap;word-break:break-all;margin:6px 0 0;opacity:.85}
+.cursor{display:inline-block;width:8px;height:15px;background:var(--pine);vertical-align:-2px;animation:bl .9s steps(2) infinite}
+@keyframes bl{0%,50%{opacity:1}51%,100%{opacity:0}}
+
+#intro{max-width:720px;margin:24px auto;font-family:var(--mono);font-size:13px;color:var(--dim);line-height:1.9}
+#intro b{color:var(--ink)}
+#intro div{padding:7px 0;border-bottom:1px solid var(--line-2)}
+
+/* ---------- composer ---------- */
+#composer{flex:0 0 auto;background:var(--panel);border-top:1px solid var(--line);
+  padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+#crow{max-width:720px;margin:0 auto;display:flex;gap:9px;align-items:flex-end}
+#input{flex:1;min-height:46px;max-height:34dvh;padding:11px 12px;background:var(--bg);
+  border:1px solid var(--line);border-radius:3px;font-size:16px;line-height:1.5;resize:none}
+#send{min-width:74px;min-height:46px;padding:0 16px;background:var(--pine);color:#fff;
+  border:1px solid var(--pine);border-radius:3px;font-weight:600;font-size:15px}
+#send.stop{background:var(--rust);border-color:var(--rust)}
+#send:disabled{opacity:.45}
+#cfoot{max-width:720px;margin:7px auto 0;font-family:var(--mono);font-size:10.5px;color:var(--dim);
+  display:flex;gap:14px;flex-wrap:wrap}
+
+/* ---------- sheet ---------- */
+#scrim{position:fixed;inset:0;background:rgba(0,0,0,.42);opacity:0;pointer-events:none;
+  transition:opacity .18s;z-index:30}
+#scrim.on{opacity:1;pointer-events:auto}
+#sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:31;height:var(--sheet-h);
+  background:var(--panel);border-top:1px solid var(--line);border-radius:12px 12px 0 0;
+  transform:translateY(101%);transition:transform .22s cubic-bezier(.3,.8,.4,1);
+  display:flex;flex-direction:column;box-shadow:0 -8px 30px rgba(0,0,0,.18);
+}
+#sheet.on{transform:none}
+.grab{width:38px;height:4px;background:var(--line);border-radius:2px;margin:9px auto 4px;flex:0 0 auto}
+#tabs{display:flex;border-bottom:1px solid var(--line);flex:0 0 auto}
+#tabs button{flex:1;min-height:46px;background:transparent;border:0;border-bottom:2px solid transparent;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+#tabs button.on{color:var(--ink);border-bottom-color:var(--pine)}
+.pane{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px calc(20px + env(safe-area-inset-bottom));display:none}
+.pane.on{display:block}
+
+label{display:block;font-family:var(--mono);font-size:11px;color:var(--dim);margin:0 0 5px;
+  letter-spacing:.06em;text-transform:uppercase}
+.field{margin-bottom:14px}
+input[type=text],input[type=password],select,textarea.set{
+  width:100%;padding:11px 12px;background:var(--bg);border:1px solid var(--line);border-radius:3px;
+}
+textarea.set{font-family:var(--mono);font-size:14px;line-height:1.55;resize:vertical}
+.hint{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px;line-height:1.6}
+.hint.ok{color:var(--pine)} .hint.bad{color:var(--rust)}
+.btn{width:100%;min-height:46px;background:var(--bg);border:1px solid var(--line);border-radius:3px;
+  font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn:active{background:var(--line-2)}
+.btn.primary{background:var(--pine);color:#fff;border-color:var(--pine)}
+.btn.danger{color:var(--rust);border-color:var(--rust)}
+.row2{display:flex;gap:9px}.row2>*{flex:1}
+.picker{width:100%;min-height:48px;text-align:left;padding:9px 12px;background:var(--bg);
+  border:1px solid var(--line);border-radius:3px;font-family:var(--mono);font-size:13.5px;
+  display:flex;justify-content:space-between;align-items:center;gap:8px}
+.picker span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picker .cv{color:var(--dim);flex:0 0 auto;font-size:16px}
+
+.item{display:flex;align-items:center;gap:8px;padding:11px 10px;border:1px solid var(--line-2);
+  border-radius:3px;margin-bottom:7px;background:var(--bg);min-height:46px}
+.item.on{border-color:var(--pine);box-shadow:inset 3px 0 0 var(--pine)}
+.item .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14.5px}
+.item .s{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+
+.logline{font-family:var(--mono);font-size:11px;padding:7px 0;border-bottom:1px solid var(--line-2);
+  display:flex;gap:8px;align-items:baseline}
+.logline .st{flex:0 0 auto;font-weight:600}
+.logline .u{flex:1;min-width:0;word-break:break-all;color:var(--dim)}
+.st.ok{color:var(--pine)} .st.bad{color:var(--rust)}
+
+.ledger{font-family:var(--mono);font-size:12px}
+.ledger .lr{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dotted var(--line)}
+.ledger .lr.tot{border-top:1px solid var(--ink);border-bottom:0;font-weight:600;margin-top:5px;padding-top:7px}
+
+.warnbox{background:var(--rust-bg);border:1px solid var(--rust);border-radius:3px;padding:11px 12px;
+  font-family:var(--mono);font-size:11.5px;color:var(--rust);line-height:1.75;margin-bottom:14px}
+
+/* model picker overlay */
+#mp{position:fixed;inset:0;z-index:40;background:var(--panel);display:none;flex-direction:column;
+  padding-top:env(safe-area-inset-top)}
+#mp.on{display:flex}
+#mphead{display:flex;gap:9px;padding:10px 12px;border-bottom:1px solid var(--line);align-items:center}
+#mpq{flex:1;padding:11px 12px;background:var(--bg);border:1px solid var(--line);border-radius:3px}
+#mplist{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px calc(20px + env(safe-area-inset-bottom))}
+.mrow{padding:12px 10px;border-bottom:1px solid var(--line-2);font-family:var(--mono);font-size:13px;
+  word-break:break-all;min-height:46px;display:flex;align-items:center;gap:8px}
+.mrow:active{background:var(--line-2)}
+.mrow.on{color:var(--pine);font-weight:600}
+.mrow .tagr{font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:2px;padding:1px 5px;flex:0 0 auto}
+
+@media (min-width:860px){
+  :root{--sheet-h:86dvh}
+  #sheet{left:auto;right:16px;bottom:16px;width:400px;height:min(760px,86dvh);border-radius:6px;border:1px solid var(--line)}
+  #mp{left:auto;right:16px;bottom:16px;top:auto;width:400px;height:min(760px,86dvh);border-radius:6px;border:1px solid var(--line)}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div id="hid">
+      <div class="p"><span class="dot" id="pdot"></span><span id="pname">—</span></div>
+      <div class="m" id="mname">モデル未選択</div>
+    </div>
+    <button class="hbtn" id="newbtn" title="新しい会話">＋</button>
+    <button class="hbtn" id="openbtn" title="設定">≡</button>
+  </header>
+
+  <div id="notice"></div>
+
+  <div id="log">
+    <div class="wrap" id="stream"></div>
+    <div id="intro">
+      <div><b>1</b> ≡ を開いて、プロバイダを選び自分のAPIキーを貼る</div>
+      <div><b>2</b> モデル欄をタップ。一覧は各社のAPIから毎回取り直す</div>
+      <div><b>3</b> 「接続テスト」でCORSを通るか先に確かめる</div>
+      <div><b>通信</b> 選んだプロバイダ以外には一切通信しない。証拠は「通信ログ」タブで全件見られる</div>
+      <div><b>鍵</b> このブラウザにしか保存されない。このファイルをWebに公開しないこと</div>
+    </div>
+  </div>
+
+  <div id="composer">
+    <div id="crow">
+      <textarea id="input" rows="1" placeholder="ここに書く"></textarea>
+      <button id="send">送信</button>
+    </div>
+    <div id="cfoot">
+      <span id="ctx">履歴 0 通</span>
+      <span id="store-state"></span>
+    </div>
+  </div>
+</div>
+
+<div id="scrim"></div>
+<div id="sheet">
+  <div class="grab"></div>
+  <div id="tabs">
+    <button data-p="conn" class="on">接続</button>
+    <button data-p="conv">会話</button>
+    <button data-p="net">通信ログ</button>
+  </div>
+
+  <div class="pane on" id="pane-conn">
+    <div class="warnbox">
+      このファイルをWebに公開しない。公開すると他人にキーを入力させる構造になり、預かる責任が発生する。<br>
+      APIキーはこのブラウザにのみ保存される。
+    </div>
+    <div class="field">
+      <label for="prov">プロバイダ</label>
+      <select id="prov"></select>
+      <div class="hint" id="provhint"></div>
+    </div>
+    <div class="field">
+      <label for="key">APIキー</label>
+      <input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="貼り付ける">
+    </div>
+    <div class="field">
+      <label>モデル</label>
+      <button class="picker" id="modelbtn"><span id="modellbl">未選択</span><span class="cv">▾</span></button>
+      <div class="hint" id="modelhint"></div>
+    </div>
+    <div class="field row2">
+      <button class="btn" id="test">接続テスト</button>
+      <button class="btn" id="refresh">一覧を更新</button>
+    </div>
+    <div class="hint" id="teststat" style="margin-top:-6px;margin-bottom:14px"></div>
+    <div class="field">
+      <label for="sys">システムプロンプト</label>
+      <textarea id="sys" class="set" rows="3" placeholder="空でも動く"></textarea>
+    </div>
+    <div class="field row2">
+      <div><label for="temp">温度</label><input type="text" id="temp" inputmode="decimal" value="1"></div>
+      <div><label for="maxtok">最大出力</label><input type="text" id="maxtok" inputmode="numeric" value="4096"></div>
+    </div>
+    <div class="field">
+      <label>使用量</label>
+      <div class="ledger" id="ledger"></div>
+    </div>
+    <button class="btn danger" id="forget">このプロバイダのキーを消す</button>
+  </div>
+
+  <div class="pane" id="pane-conv">
+    <div class="row2" style="margin-bottom:14px">
+      <button class="btn primary" id="newconv">新しい会話</button>
+      <button class="btn" id="export">書き出す</button>
+    </div>
+    <button class="btn" id="rename" style="margin-bottom:14px">今の会話の名前を変える</button>
+    <div id="convlist"></div>
+  </div>
+
+  <div class="pane" id="pane-net">
+    <div class="hint" style="margin:0 0 12px">
+      このアプリが出した通信の全件。ここに載っていない宛先には通信していない。
+    </div>
+    <button class="btn" id="clearnet" style="margin-bottom:12px">記録を消す</button>
+    <div id="netlist"></div>
+  </div>
+</div>
+
+<div id="mp">
+  <div id="mphead">
+    <input type="text" id="mpq" placeholder="モデル名で絞り込む / 直接入力" spellcheck="false" autocomplete="off">
+    <button class="hbtn" id="mpclose">✕</button>
+  </div>
+  <div id="mplist"></div>
+</div>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+
+/* ================= 保存層 ================= */
+const store=(()=>{let ok=true;try{localStorage.setItem("__t","1");localStorage.removeItem("__t")}catch(e){ok=false}
+const mem={};return{ok,
+ get(k){try{return ok?localStorage.getItem(k):(mem[k]??null)}catch(e){return mem[k]??null}},
+ set(k,v){try{ok?localStorage.setItem(k,v):(mem[k]=v)}catch(e){mem[k]=v}},
+ del(k){try{ok?localStorage.removeItem(k):delete mem[k]}catch(e){delete mem[k]}}};})();
+if(!store.ok){$("notice").className="on";
+  $("notice").textContent="localStorageが使えない。会話とキーはタブを閉じると消える。このファイルを保存してブラウザで直接開けば残る。";}
+$("store-state").textContent = store.ok ? "保存: この端末" : "保存: メモリのみ";
+
+/* ================= プロバイダ ================= */
+const PROVIDERS={
+ openrouter:{name:"OpenRouter",color:"#3E8E7E",shape:"openai",
+  chat:"https://openrouter.ai/api/v1/chat/completions",
+  models:"https://openrouter.ai/api/v1/models",
+  hint:"1本の鍵でClaude/Grok/DeepSeekをまとめて叩ける。ブラウザ直叩き対応。プロンプトはOpenRouterのサーバーを経由する。",
+  head:k=>({"Authorization":"Bearer "+k,"Content-Type":"application/json","X-Title":"byok-console"})},
+ anthropic:{name:"Anthropic",color:"#C2603F",shape:"anthropic",
+  chat:"https://api.anthropic.com/v1/messages",
+  models:"https://api.anthropic.com/v1/models?limit=100",
+  hint:"ブラウザから叩くための専用ヘッダを自動で付けている。付けないと401。",
+  head:k=>({"x-api-key":k,"anthropic-version":"2023-06-01",
+    "anthropic-dangerous-direct-browser-access":"true","Content-Type":"application/json"})},
+ xai:{name:"xAI (Grok)",color:"#7E8FA6",shape:"openai",
+  chat:"https://api.x.ai/v1/chat/completions",
+  models:"https://api.x.ai/v1/models",
+  hint:"ブラウザ直叩きの可否は公式に明記なし。接続テストで先に確かめること。",
+  head:k=>({"Authorization":"Bearer "+k,"Content-Type":"application/json"})},
+ deepseek:{name:"DeepSeek",color:"#5C6BC0",shape:"openai",
+  chat:"https://api.deepseek.com/chat/completions",
+  models:"https://api.deepseek.com/models",
+  hint:"同上。弾かれたらOpenRouter経由に切り替えるのが早い。",
+  head:k=>({"Authorization":"Bearer "+k,"Content-Type":"application/json"})}
+};
+const K=p=>"bk.key."+p, M=p=>"bk.model."+p, MC=p=>"bk.mcache."+p, RC=p=>"bk.recent."+p;
+const CACHE_MS=24*60*60*1000;
+
+/* ================= 状態 ================= */
+let S={
+ prov: store.get("bk.prov") || "openrouter",
+ convs: safeJSON(store.get("bk.convs"),[]),
+ active: store.get("bk.active") || null,
+ ledger: safeJSON(store.get("bk.ledger"),{}),
+ net: [],
+ models: [],
+ busy:false, abort:null
+};
+function safeJSON(s,f){try{const v=JSON.parse(s);return v??f}catch(e){return f}}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+const saveConvs=()=>store.set("bk.convs",JSON.stringify(S.convs));
+const saveLedger=()=>store.set("bk.ledger",JSON.stringify(S.ledger));
+const cur=()=>S.convs.find(c=>c.id===S.active)||null;
+
+/* ================= 通信ログ（全fetchを通す） ================= */
+async function call(url,opt){
+  const rec={url,t:new Date().toLocaleTimeString("ja-JP"),status:"…",ok:null};
+  S.net.unshift(rec); if(S.net.length>200) S.net.pop(); renderNet();
+  try{
+    const r=await fetch(url,opt);
+    rec.status="HTTP "+r.status; rec.ok=r.ok; renderNet();
+    return r;
+  }catch(e){
+    rec.status="ブロック"; rec.ok=false; renderNet(); throw e;
+  }
+}
+function renderNet(){
+  const box=$("netlist"); if(!box) return; box.innerHTML="";
+  if(!S.net.length){const d=document.createElement("div");d.className="hint";d.textContent="まだ通信していない。";box.appendChild(d);return}
+  S.net.forEach(r=>{
+    const d=document.createElement("div"); d.className="logline";
+    const s=document.createElement("span"); s.className="st "+(r.ok===true?"ok":r.ok===false?"bad":""); s.textContent=r.status;
+    const u=document.createElement("span"); u.className="u"; u.textContent=r.url;
+    const t=document.createElement("span"); t.style.color="var(--dim)"; t.style.flex="0 0 auto"; t.textContent=r.t;
+    d.append(s,u,t); box.appendChild(d);
+  });
+}
+$("clearnet").addEventListener("click",()=>{S.net=[];renderNet()});
+
+/* ================= プロバイダ同期 ================= */
+(function(){const s=$("prov");for(const[k,v]of Object.entries(PROVIDERS)){
+  const o=document.createElement("option");o.value=k;o.textContent=v.name;s.appendChild(o)}s.value=S.prov})();
+
+function syncProv(){
+  const P=PROVIDERS[S.prov];
+  $("key").value=store.get(K(S.prov))||"";
+  $("provhint").textContent=P.hint;
+  $("pname").textContent=P.name; $("pdot").style.background=P.color;
+  setModel(store.get(M(S.prov))||"",false);
+  $("teststat").textContent=""; $("teststat").className="hint";
+  store.set("bk.prov",S.prov);
+  loadModels(false);
+  renderLedger();
+}
+function setModel(m,persist=true){
+  $("modellbl").textContent=m||"未選択";
+  $("mname").textContent=m||"モデル未選択";
+  if(persist&&m){store.set(M(S.prov),m);
+    const r=safeJSON(store.get(RC(S.prov)),[]).filter(x=>x!==m);r.unshift(m);
+    store.set(RC(S.prov),JSON.stringify(r.slice(0,6)));}
+}
+$("prov").addEventListener("change",e=>{S.prov=e.target.value;syncProv()});
+$("key").addEventListener("input",e=>{store.set(K(S.prov),e.target.value.trim())});
+$("forget").addEventListener("click",()=>{
+  if(!confirm(PROVIDERS[S.prov].name+" のキーを消す？")) return;
+  store.del(K(S.prov));$("key").value="";
+  $("teststat").className="hint";$("teststat").textContent="消した。";
+});
+["sys","temp","maxtok"].forEach(id=>{const el=$(id);
+  el.value=store.get("bk."+id)??el.value;
+  el.addEventListener("input",()=>store.set("bk."+id,el.value))});
+
+/* ================= モデル一覧（自動更新） ================= */
+async function loadModels(force){
+  const P=PROVIDERS[S.prov], key=($("key").value||"").trim();
+  const cached=safeJSON(store.get(MC(S.prov)),null);
+  if(cached&&cached.list&&!force){
+    S.models=cached.list;
+    const age=Date.now()-(cached.at||0);
+    $("modelhint").className="hint";
+    $("modelhint").textContent=S.models.length+"件（"+Math.floor(age/3600000)+"時間前に取得）";
+    if(age<CACHE_MS) return;
+  }
+  if(!key){ if(!cached){S.models=[];$("modelhint").className="hint";
+    $("modelhint").textContent="キーを入れると一覧を取りに行く。入れなくても直接入力で使える。"} return; }
+  $("modelhint").className="hint"; $("modelhint").textContent="一覧を取得中…";
+  try{
+    const r=await call(P.models,{headers:P.head(key)});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const j=await r.json();
+    const raw = Array.isArray(j) ? j : (j.data || j.models || []);
+    const list=[];
+    for(const it of raw){
+      if(!it||typeof it!=="object") continue;
+      const id=it.id||it.name||it.model;              // 構造を決め打ちしない
+      if(typeof id!=="string"||!id) continue;
+      list.push(id);
+    }
+    if(!list.length) throw new Error("一覧が空");
+    S.models=list.sort();
+    store.set(MC(S.prov),JSON.stringify({at:Date.now(),list:S.models}));
+    $("modelhint").className="hint ok"; $("modelhint").textContent=S.models.length+"件を取得した。";
+  }catch(e){
+    S.models=cached?.list||[];
+    $("modelhint").className="hint bad";
+    $("modelhint").textContent="一覧を取れなかった（"+String(e.message||e).slice(0,60)+"）。モデル名は直接入力すれば使える。";
+  }
+}
+$("refresh").addEventListener("click",()=>loadModels(true));
+
+/* model picker */
+function openMP(){
+  $("mp").className="on"; $("mpq").value=""; renderMP("");
+  setTimeout(()=>$("mpq").focus(),60);
+}
+$("modelbtn").addEventListener("click",openMP);
+$("mpclose").addEventListener("click",()=>$("mp").className="");
+$("mpq").addEventListener("input",e=>renderMP(e.target.value.trim()));
+$("mpq").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){const v=e.target.value.trim();if(v){setModel(v);$("mp").className=""}}
+});
+function renderMP(q){
+  const box=$("mplist"); box.innerHTML="";
+  const now=($("modellbl").textContent||"");
+  const recent=safeJSON(store.get(RC(S.prov)),[]);
+  const ql=q.toLowerCase();
+  const hit=S.models.filter(m=>!ql||m.toLowerCase().includes(ql));
+  if(q&&!S.models.includes(q)){
+    box.appendChild(mrow(q,"直接入力",()=>{setModel(q);$("mp").className=""}));
+  }
+  recent.filter(m=>!ql||m.toLowerCase().includes(ql)).forEach(m=>{
+    box.appendChild(mrow(m,"最近",()=>{setModel(m);$("mp").className=""},m===now));
+  });
+  if(!hit.length&&!q){
+    const d=document.createElement("div");d.className="hint";
+    d.textContent="一覧が空。上の欄にモデル名を直接打ってEnterで使える。";box.appendChild(d);
+  }
+  hit.slice(0,400).forEach(m=>{
+    if(recent.includes(m)&&(!ql||m.toLowerCase().includes(ql))) return;
+    box.appendChild(mrow(m,"",()=>{setModel(m);$("mp").className=""},m===now));
+  });
+}
+function mrow(text,tag,fn,on){
+  const d=document.createElement("div"); d.className="mrow"+(on?" on":""); d.setAttribute("role","button"); d.tabIndex=0;
+  const s=document.createElement("span");s.style.flex="1";s.style.minWidth="0";s.textContent=text;d.appendChild(s);
+  if(tag){const t=document.createElement("span");t.className="tagr";t.textContent=tag;d.appendChild(t)}
+  d.addEventListener("click",fn);
+  d.addEventListener("keydown",e=>{if(e.key==="Enter")fn()});
+  return d;
+}
+
+/* ================= シート ================= */
+function openSheet(p){
+  if(p) switchTab(p);
+  $("sheet").classList.add("on"); $("scrim").classList.add("on");
+}
+function closeSheet(){$("sheet").classList.remove("on");$("scrim").classList.remove("on")}
+$("openbtn").addEventListener("click",()=>openSheet());
+$("scrim").addEventListener("click",closeSheet);
+function switchTab(p){
+  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.p===p));
+  document.querySelectorAll(".pane").forEach(x=>x.classList.toggle("on",x.id==="pane-"+p));
+}
+document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.p)));
+
+/* ================= 会話 ================= */
+function newConv(){
+  const c={id:uid(),title:"無題",msgs:[],at:Date.now()};
+  S.convs.unshift(c);S.active=c.id;store.set("bk.active",c.id);
+  saveConvs();renderConvs();renderLog();return c;
+}
+$("newbtn").addEventListener("click",()=>{newConv();closeSheet()});
+$("newconv").addEventListener("click",()=>{newConv();closeSheet()});
+$("rename").addEventListener("click",()=>{const c=cur();if(!c)return;
+  const t=prompt("会話の名前",c.title);if(t===null)return;
+  c.title=t.trim()||"無題";saveConvs();renderConvs();});
+$("export").addEventListener("click",()=>{
+  const c=cur();if(!c||!c.msgs.length){alert("書き出す内容がない。");return}
+  const md="# "+c.title+"\n\n"+c.msgs.map(m=>"## "+(m.role==="user"?"自分":m.role==="error"?"エラー":"AI")+
+    (m.model?" — "+m.model:"")+"\n\n"+m.text).join("\n\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([md],{type:"text/markdown;charset=utf-8"}));
+  a.download=c.title.replace(/[\\/:*?"<>|]/g,"_").slice(0,50)+".md";a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+});
+function renderConvs(){
+  const box=$("convlist");box.innerHTML="";
+  if(!S.convs.length){const d=document.createElement("div");d.className="hint";d.textContent="まだ会話がない。";box.appendChild(d);return}
+  S.convs.forEach(c=>{
+    const el=document.createElement("div");el.className="item"+(c.id===S.active?" on":"");
+    const t=document.createElement("div");t.className="t";t.textContent=c.title;
+    const s=document.createElement("div");s.className="s";s.textContent=c.msgs.length+"通";
+    const x=document.createElement("button");x.className="mini";x.textContent="削除";
+    x.addEventListener("click",ev=>{ev.stopPropagation();
+      if(!confirm("「"+c.title+"」を消す？戻せない。"))return;
+      S.convs=S.convs.filter(v=>v.id!==c.id);
+      if(S.active===c.id){S.active=S.convs[0]?.id||null;store.set("bk.active",S.active||"")}
+      saveConvs();renderConvs();renderLog();});
+    el.addEventListener("click",()=>{S.active=c.id;store.set("bk.active",c.id);renderConvs();renderLog();closeSheet()});
+    el.append(t,s,x);box.appendChild(el);
+  });
+}
+
+/* ================= ログ ================= */
+function msgEl(m){
+  const d=document.createElement("div");
+  d.className="msg "+(m.role==="user"?"user":m.role==="error"?"error":"assistant");
+  const w=document.createElement("div");w.className="who";
+  const a=document.createElement("span");a.textContent=m.role==="user"?"自分":m.role==="error"?"失敗":"AI";w.appendChild(a);
+  if(m.model){const s=document.createElement("span");s.className="meta";s.textContent=m.model;w.appendChild(s)}
+  if(m.usage){const s=document.createElement("span");s.className="meta";
+    s.textContent="in "+m.usage.in+" / out "+m.usage.out+(m.usage.est?"（推定）":"");w.appendChild(s)}
+  const b=document.createElement("div");b.className="body";b.textContent=m.text;
+  d.append(w,b);
+  if(m.raw){const dt=document.createElement("details");dt.className="raw";
+    const sm=document.createElement("summary");sm.textContent="サーバーの返答（原文）";
+    const pre=document.createElement("pre");pre.textContent=m.raw;dt.append(sm,pre);d.appendChild(dt)}
+  if(m.role!=="error"&&m.text){
+    const act=document.createElement("div");act.className="act";
+    const cp=document.createElement("button");cp.className="mini";cp.textContent="コピー";
+    cp.addEventListener("click",()=>{navigator.clipboard?.writeText(m.text);
+      cp.textContent="コピーした";setTimeout(()=>cp.textContent="コピー",1200)});
+    act.appendChild(cp);d.appendChild(act);
+  }
+  return d;
+}
+function renderLog(){
+  const c=cur(),box=$("stream");box.innerHTML="";
+  $("intro").style.display=(c&&c.msgs.length)?"none":"block";
+  if(c)c.msgs.forEach(m=>box.appendChild(msgEl(m)));
+  $("ctx").textContent="履歴 "+(c?c.msgs.filter(m=>m.role!=="error").length:0)+" 通";
+  $("log").scrollTop=$("log").scrollHeight;
+}
+function nearBottom(){const l=$("log");return l.scrollHeight-l.scrollTop-l.clientHeight<150}
+
+/* ================= 使用量 ================= */
+function bump(p,i,o){const r=S.ledger[p]||{calls:0,in:0,out:0};
+  r.calls++;r.in+=i||0;r.out+=o||0;S.ledger[p]=r;saveLedger();renderLedger()}
+function renderLedger(){
+  const box=$("ledger");box.innerHTML="";
+  const ks=Object.keys(S.ledger);
+  if(!ks.length){const d=document.createElement("div");d.className="hint";d.textContent="まだ記録なし";box.appendChild(d);return}
+  let ci=0,ti=0,to=0;
+  ks.forEach(k=>{const r=S.ledger[k];ci+=r.calls;ti+=r.in;to+=r.out;
+    const row=document.createElement("div");row.className="lr";
+    const a=document.createElement("span");a.textContent=PROVIDERS[k]?.name||k;
+    const b=document.createElement("span");b.textContent=r.calls+"回 "+fmt(r.in)+"↓ "+fmt(r.out)+"↑";
+    row.append(a,b);box.appendChild(row)});
+  const t=document.createElement("div");t.className="lr tot";
+  const a=document.createElement("span");a.textContent="合計 "+ci+"回";
+  const b=document.createElement("span");b.textContent=fmt(ti)+"↓ "+fmt(to)+"↑";
+  t.append(a,b);box.appendChild(t);
+}
+const fmt=n=>n>=1000?(n/1000).toFixed(1)+"k":String(n||0);
+
+/* ================= リクエスト ================= */
+function buildBody(prov,model,msgs,sys,stream){
+  const t=parseFloat($("temp").value),mt=parseInt($("maxtok").value,10);
+  if(PROVIDERS[prov].shape==="anthropic"){
+    const b={model,max_tokens:isNaN(mt)?4096:mt,stream,
+      messages:msgs.map(m=>({role:m.role,content:m.text}))};
+    if(sys)b.system=sys; if(!isNaN(t))b.temperature=Math.min(t,1);
+    return b;
+  }
+  const list=sys?[{role:"system",content:sys}]:[];
+  msgs.forEach(m=>list.push({role:m.role,content:m.text}));
+  const b={model,messages:list,stream};
+  if(!isNaN(mt))b.max_tokens=mt; if(!isNaN(t))b.temperature=t;
+  if(stream)b.stream_options={include_usage:true};
+  return b;
+}
+function blockedMsg(prov){
+  return "ブラウザに止められた。ほぼCORS。\n\n"+
+  "・"+PROVIDERS[prov].name+" がブラウザからの直接呼び出しを許していない可能性が高い。\n"+
+  "・開発者ツールのコンソールに 'Access-Control-Allow-Origin' が無い旨のエラーが出ていれば確定。\n"+
+  "・OpenRouterに切り替えれば同じモデルを叩ける。中継サーバーを立てるのは、キーの管理責任が増えるので勧めない。";
+}
+async function send(){
+  if(S.busy)return;
+  const text=$("input").value.trim(); if(!text)return;
+  const prov=S.prov,P=PROVIDERS[prov];
+  const key=($("key").value||"").trim(),model=($("modellbl").textContent||"").trim();
+  if(!key){openSheet("conn");$("teststat").className="hint bad";$("teststat").textContent="キーが空。";return}
+  if(!model||model==="未選択"){openSheet("conn");openMP();return}
+
+  let c=cur()||newConv();
+  c.msgs.push({role:"user",text});
+  if(c.title==="無題")c.title=text.slice(0,26).replace(/\n/g," ")+(text.length>26?"…":"");
+  $("input").value="";autosize();saveConvs();renderConvs();renderLog();
+
+  S.busy=true;$("send").textContent="停止";$("send").classList.add("stop");
+  S.abort=new AbortController();
+
+  const hold={role:"assistant",text:"",model};
+  const el=msgEl(hold),bodyEl=el.querySelector(".body");
+  const cs=document.createElement("span");cs.className="cursor";bodyEl.appendChild(cs);
+  $("stream").appendChild(el);$("intro").style.display="none";
+  $("log").scrollTop=$("log").scrollHeight;
+
+  try{
+    const res=await call(P.chat,{method:"POST",headers:P.head(key),
+      body:JSON.stringify(buildBody(prov,model,c.msgs.filter(m=>m.role!=="error"),$("sys").value.trim(),true)),
+      signal:S.abort.signal});
+    if(!res.ok){
+      const t=await res.text();
+      let msg="HTTP "+res.status+"：";
+      if(res.status===401)msg+="キーが違うか、権限がない。";
+      else if(res.status===404)msg+="そのモデル名が存在しない。一覧を更新するか名前を確認。";
+      else if(res.status===429)msg+="レート上限か残高不足。";
+      else if(res.status>=500)msg+="相手側の障害。少し待って再送。";
+      else msg+="リクエストが受理されなかった。";
+      const e=new Error(msg);e.raw=t.slice(0,2000);throw e;
+    }
+    const usage=await readStream(res,prov,ch=>{
+      hold.text+=ch;bodyEl.textContent=hold.text;bodyEl.appendChild(cs);
+      if(nearBottom())$("log").scrollTop=$("log").scrollHeight;
+    });
+    cs.remove();
+    if(!hold.text)hold.text="(空の応答が返ってきた)";
+    if(usage){hold.usage=usage;bump(prov,usage.in,usage.out)}
+    else{const i=Math.round(JSON.stringify(c.msgs).length/3.5),o=Math.round(hold.text.length/2.2);
+      hold.usage={in:i,out:o,est:true};bump(prov,i,o)}
+    c.msgs.push(hold);
+  }catch(err){
+    cs.remove();el.remove();
+    if(err.name==="AbortError"){ if(hold.text) c.msgs.push(hold); }
+    else{
+      const isNet=/Failed to fetch|NetworkError|Load failed|ネットワーク/i.test(String(err.message||err));
+      c.msgs.push({role:"error",text:isNet?blockedMsg(prov):String(err.message||err),raw:err.raw});
+    }
+  }finally{
+    S.busy=false;$("send").textContent="送信";$("send").classList.remove("stop");S.abort=null;
+    c.at=Date.now();saveConvs();renderLog();
+  }
+}
+async function readStream(res,prov,onChunk){
+  const shape=PROVIDERS[prov].shape;
+  const rd=res.body.getReader(),dec=new TextDecoder();
+  let buf="",usage=null;
+  while(true){
+    const{done,value}=await rd.read(); if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    const lines=buf.split("\n"); buf=lines.pop();
+    for(const raw of lines){
+      const line=raw.trim(); if(!line.startsWith("data:"))continue;
+      const data=line.slice(5).trim(); if(!data||data==="[DONE]")continue;
+      let j;try{j=JSON.parse(data)}catch(e){continue}
+      if(shape==="anthropic"){
+        if(j.type==="content_block_delta"&&typeof j.delta?.text==="string")onChunk(j.delta.text);
+        if(j.type==="message_start"&&j.message?.usage)usage={in:j.message.usage.input_tokens||0,out:0};
+        if(j.type==="message_delta"&&j.usage)usage={in:usage?.in||0,out:j.usage.output_tokens||0};
+        if(j.type==="error")throw new Error(JSON.stringify(j.error));
+      }else{
+        const d=j.choices?.[0]?.delta;
+        if(d&&typeof d.content==="string"&&d.content)onChunk(d.content);
+        if(j.usage)usage={in:j.usage.prompt_tokens||0,out:j.usage.completion_tokens||0};
+        if(j.error)throw new Error(JSON.stringify(j.error));
+      }
+    }
+  }
+  return usage;
+}
+
+/* ================= 接続テスト ================= */
+$("test").addEventListener("click",async()=>{
+  const P=PROVIDERS[S.prov],key=($("key").value||"").trim();
+  const model=($("modellbl").textContent||"").trim();
+  const st=$("teststat");
+  if(!key){st.className="hint bad";st.textContent="キーが空。";return}
+  if(!model||model==="未選択"){st.className="hint bad";st.textContent="モデルが未選択。";return}
+  st.className="hint";st.textContent="試している…";
+  try{
+    const r=await call(P.chat,{method:"POST",headers:P.head(key),
+      body:JSON.stringify(buildBody(S.prov,model,[{role:"user",text:"ping"}],"",false))});
+    const t=await r.text();
+    if(r.ok){st.className="hint ok";st.textContent="通った。CORSの壁はない。"}
+    else{st.className="hint bad";st.textContent="サーバーは応答したがエラー: HTTP "+r.status+" — "+t.slice(0,160)}
+  }catch(e){
+    st.className="hint bad";
+    st.textContent="ブラウザに止められた（ほぼCORS）。このプロバイダは直叩き不可の可能性が高い。OpenRouter経由なら同じモデルを叩ける。";
+  }
+});
+
+/* ================= 入力 ================= */
+function autosize(){const t=$("input");t.style.height="auto";
+  t.style.height=Math.min(t.scrollHeight,Math.round(innerHeight*0.34))+"px"}
+$("input").addEventListener("input",autosize);
+$("input").addEventListener("keydown",e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){e.preventDefault();send()}
+});
+$("send").addEventListener("click",()=>{
+  if(S.busy&&S.abort){S.abort.abort();return}
+  send();
+});
+addEventListener("keydown",e=>{if(e.key==="Escape"){
+  if($("mp").className==="on")$("mp").className="";else closeSheet()}});
+
+/* ================= 起動 ================= */
+syncProv();
+if(!S.convs.length)newConv();
+if(!cur()){S.active=S.convs[0].id;store.set("bk.active",S.active)}
+renderConvs();renderLog();renderLedger();renderNet();autosize();
+</script>
+</body>
+</html>
